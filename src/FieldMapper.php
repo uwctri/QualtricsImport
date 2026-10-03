@@ -2,6 +2,10 @@
 
 namespace UWMadison\QualtricsImport;
 
+use LogicTester;
+use Project;
+use Throwable;
+
 class FieldMapper
 {
     /**
@@ -163,15 +167,15 @@ class FieldMapper
         }
 
         // Attempt native REDCap LogicTester if Project context is available
-        if ($projectId !== null && class_exists('\LogicTester') && class_exists('\Project')) {
+        if ($projectId !== null && class_exists(LogicTester::class) && class_exists(Project::class)) {
             try {
-                $proj = new \Project($projectId);
+                $proj = new Project($projectId);
                 $eventId = !empty($record['redcap_event_name']) && isset($proj->uniqueEventNames[$record['redcap_event_name']])
                     ? array_search($record['redcap_event_name'], $proj->uniqueEventNames)
                     : $proj->firstEventId;
                 $recordData = [$eventId => $record];
-                return (bool)\LogicTester::apply($logic, $recordData, $proj);
-            } catch (\Throwable) {
+                return (bool)LogicTester::apply($logic, $recordData, $proj);
+            } catch (Throwable) {
                 // Fall back to standalone logic parser below
             }
         }

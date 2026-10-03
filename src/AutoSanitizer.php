@@ -3,7 +3,6 @@
 namespace UWMadison\QualtricsImport;
 
 use DateTime;
-use Throwable;
 
 class AutoSanitizer
 {

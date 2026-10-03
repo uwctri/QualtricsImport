@@ -3,7 +3,6 @@
 namespace UWMadison\QualtricsImport;
 
 use ExternalModules\AbstractExternalModule;
-use ExternalModules\ExternalModules;
 use REDCap;
 use Exception;
 
@@ -148,6 +147,17 @@ class QualtricsImport extends AbstractExternalModule
                     'scores' => null,
                 ];
                 $categoryCounts['missing_required']++;
+
+                if (!$isDryRun) {
+                    $this->log("Qualtrics Import: Response excluded", [
+                        'project_id' => $projectId,
+                        'qualtrics_id' => (string)($rawRow['ResponseId'] ?? ''),
+                        'candidate_name' => trim(($rawRow['first_name'] ?? '') . ' ' . ($rawRow['last_name'] ?? '')),
+                        'candidate_phone' => (string)($rawRow['phone1'] ?? ''),
+                        'status' => 'skipped_ineligible',
+                        'reason' => 'Excluded by filter logic, completion status, or missing required fields',
+                    ]);
+                }
                 continue;
             }
 
@@ -203,6 +213,19 @@ class QualtricsImport extends AbstractExternalModule
                 };
 
                 $evaluations[] = $evalSummary;
+
+                if (!$isDryRun) {
+                    $this->log("Qualtrics Import: Duplicate response excluded", [
+                        'project_id' => $projectId,
+                        'qualtrics_id' => $mapped['qualtrics_id'],
+                        'candidate_name' => $mapped['display_name'],
+                        'candidate_phone' => $mapped['phone1'],
+                        'category' => $eval['category'],
+                        'status' => $eval['status'],
+                        'matched_record_id' => $eval['matched_record']['record_id'] ?? $eval['original_record_id'] ?? null,
+                        'description' => $eval['description'],
+                    ]);
+                }
                 continue;
             }
 
@@ -236,6 +259,7 @@ class QualtricsImport extends AbstractExternalModule
                 $categoryCounts['clean_new']++;
             }
 
+
             // Add accepted record to pool for intra-batch deduplication
             $poolRecords[] = [
                 'record_id' => $allocatedId,
@@ -262,7 +286,12 @@ class QualtricsImport extends AbstractExternalModule
         if (!$isDryRun) {
             $results['commit_results'] = RecordManager::commitImports($projectId, $newRecordsToSave, $noteUpdatesToSave);
             $this->setProjectSetting('last_successful_sync_time', gmdate('Y-m-d\TH:i:s\Z'), $projectId);
-            $this->log("Qualtrics Import completed for project {$projectId}: " . json_encode($results['counts']));
+            $this->log("Qualtrics Import completed for project {$projectId}", [
+                'project_id' => $projectId,
+                'imported_count' => count($newRecordsToSave),
+                'notes_updated_count' => count($noteUpdatesToSave),
+                'counts' => json_encode($results['counts']),
+            ]);
         }
 
         return $results;
