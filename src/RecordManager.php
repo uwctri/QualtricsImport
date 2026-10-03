@@ -3,7 +3,6 @@
 namespace UWMadison\QualtricsImport;
 
 use REDCap;
-use ExternalModules\ExternalModules;
 
 class RecordManager
 {
@@ -13,7 +12,8 @@ class RecordManager
     public static function fetchExistingRecords(int $projectId, array $config): array
     {
         $idField = REDCap::getRecordIdField();
-        $qualtricsIdField = $config['qualtrics_id_field'] ?? 'qualtrics_id';
+        $strategy = $config['record_id_strategy'] ?? 'seed_increment';
+        $qualtricsIdField = ($strategy === 'qualtrics_response_id') ? $idField : ($config['qualtrics_id_field'] ?? 'qualtrics_id');
         $phoneField = $config['dedup_phone_field'] ?? 'phone1';
         $firstField = $config['dedup_first_name_field'] ?? 'first_name';
         $lastField = $config['dedup_last_name_field'] ?? 'last_name';
@@ -126,17 +126,5 @@ class RecordManager
         }
 
         return $results;
-    }
-
-    /**
-     * Trigger downstream Call Log module intake processing if enabled.
-     */
-    public static function triggerCallLog(int $projectId, array $importedRecordIds): bool
-    {
-        if (empty($importedRecordIds)) {
-            return false;
-        }
-
-        return (bool)ExternalModules::getModuleInstance('call_log')?->cronTemporalLifecycle(['project_id' => $projectId]);
     }
 }

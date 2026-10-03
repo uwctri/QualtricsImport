@@ -91,7 +91,7 @@ class Deduplicator
             if ($respId !== '' && $existing['qualtrics_id'] !== '' && $respId === $existing['qualtrics_id']) {
                 return [
                     'status' => 'skipped_case_1',
-                    'category' => 'Case 1: Already Imported',
+                    'category' => 'Already Imported',
                     'description' => "Qualtrics ResponseId '{$respId}' already exists in REDCap record {$existing['record_id']}",
                     'candidate' => $candidate,
                     'is_duplicate' => true,
@@ -107,7 +107,7 @@ class Deduplicator
                 if ($lastSim >= $case2LastThreshold && $firstSim >= $case2FirstThreshold) {
                     return [
                         'status' => 'skipped_case_2',
-                        'category' => 'Case 2: Definite Duplicate',
+                        'category' => 'Duplicate Submission',
                         'description' => sprintf(
                             "Duplicate candidate skipped (Phone: %s, Name: %s %s matches record %s '%s %s', scores: %.2f/%.2f)",
                             $candPhone,
@@ -126,7 +126,7 @@ class Deduplicator
                     ];
                 }
 
-                // Case 3: Exact phone + different name -> Household shared phone
+                // Exact phone + different name -> Household shared phone
                 $origId = $existing['record_id'];
                 $noteEntry = sprintf(
                     "[%s] Duplicate phone submission rejected for candidate '%s %s' (Phone: %s)",
@@ -138,7 +138,7 @@ class Deduplicator
 
                 return [
                     'status' => 'rejected_case_3',
-                    'category' => 'Case 3: Shared Phone Conflict',
+                    'category' => 'Shared Phone Conflict',
                     'description' => sprintf(
                         "Household shared phone duplicate rejected (Phone: %s, Candidate: '%s %s' shares phone with existing record %s '%s %s')",
                         $candPhone,
@@ -157,7 +157,7 @@ class Deduplicator
                 ];
             }
 
-            // Different phone: Check Case 4 (Very similar name, possible duplicate)
+            // Different phone: Check very similar name, possible duplicate
             if ($suspectedDuplicateNote === '') {
                 $firstSim = self::nameSimilarity($candFirst, $existFirst);
                 $lastSim = self::nameSimilarity($candLast, $existLast);
@@ -178,11 +178,11 @@ class Deduplicator
             }
         }
 
-        // Case 4: Suspected duplicate (accepted as new record with candidate note)
+        // Suspected duplicate (accepted as new record with candidate note)
         if ($suspectedDuplicateNote !== '') {
             return [
                 'status' => 'accepted_case_4',
-                'category' => 'Case 4: Suspected Duplicate',
+                'category' => 'Possible Duplicate (Different Phone)',
                 'description' => $suspectedDuplicateNote,
                 'candidate' => $candidate,
                 'is_duplicate' => false,

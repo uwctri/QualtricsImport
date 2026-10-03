@@ -83,7 +83,26 @@
         $('#cntExcluded').text((counts.case_1_existing_id || 0) + (counts.invalid_phone || 0) + (counts.missing_required || 0));
     };
 
+    const showStatusAlert = (message, type = 'info') => {
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show mb-3" role="alert">
+                ${message}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        `;
+        $('#importAlertArea').html(alertHtml);
+    };
+
     const loadPreview = () => {
+        if (!module.hasSurveyId) {
+            $('#previewLoading').hide();
+            $('#previewContent').show();
+            renderTable([]);
+            return;
+        }
+
         $('#previewLoading').show();
         $('#previewContent').hide();
         $('#btnRunImport').prop('disabled', true);
@@ -93,8 +112,8 @@
                 $('#previewLoading').hide();
                 $('#previewContent').show();
 
-                if (!res.success) {
-                    alert('Error generating preview: ' + (res.message || 'Unknown error'));
+                if (!res || !res.success || !res.data) {
+                    renderTable([]);
                     return;
                 }
 
@@ -107,9 +126,10 @@
                     $('#btnRunImport').prop('disabled', false);
                 }
             })
-            .catch(err => {
+            .catch(() => {
                 $('#previewLoading').hide();
-                alert('AJAX error while loading preview: ' + err);
+                $('#previewContent').show();
+                renderTable([]);
             });
     };
 
@@ -120,14 +140,15 @@
 
         $('#btnRunImport').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Importing...');
         $('#btnRefresh').prop('disabled', true);
+        $('#importAlertArea').empty();
 
         module.ajax('runImport', {})
             .then(res => {
                 $('#btnRunImport').html('<i class="fas fa-play"></i> Run Import Now');
                 $('#btnRefresh').prop('disabled', false);
 
-                if (!res.success) {
-                    alert('Import failed: ' + (res.message || 'Unknown error'));
+                if (!res || !res.success) {
+                    showStatusAlert('Import failed: ' + (res && res.message ? res.message : 'Unknown error'), 'danger');
                     return;
                 }
 
@@ -135,13 +156,13 @@
                 const imported = d.ready_to_import_count || 0;
                 const notes = d.note_updates_count || 0;
 
-                alert(`Import completed successfully!\n\nNew Records Imported: ${imported}\nExisting Records Updated: ${notes}`);
+                showStatusAlert(`<strong>Import completed successfully!</strong> ${imported} record(s) imported, ${notes} note(s) updated.`, 'success');
                 loadPreview();
             })
             .catch(err => {
                 $('#btnRunImport').prop('disabled', false).html('<i class="fas fa-play"></i> Run Import Now');
                 $('#btnRefresh').prop('disabled', false);
-                alert('AJAX error during import execution: ' + err);
+                showStatusAlert('AJAX error during import execution: ' + err, 'danger');
             });
     };
 
@@ -164,7 +185,13 @@
             }
         });
 
-        // Initial preview load
-        loadPreview();
+        // Initial preview load if survey is configured
+        if (module.hasSurveyId) {
+            loadPreview();
+        } else {
+            $('#previewLoading').hide();
+            $('#previewContent').show();
+            renderTable([]);
+        }
     });
 })();

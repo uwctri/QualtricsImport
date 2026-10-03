@@ -23,9 +23,29 @@ class QualtricsImport extends AbstractExternalModule
         if ($this->isPage('ExternalModules/manager/project.php')) {
             $this->initializeJavascriptModuleObject();
             $this->passArgument('prefix', $this->PREFIX);
-            $this->passArgument('isCallLogInstalled', ExternalModules::isModuleEnabled('call_log'));
+            $this->passArgument('allowProjectOverrides', (bool)$this->getSystemSetting('allow_project_overrides'));
             $this->includeJs('js/config_modal.js', 'defer');
         }
+    }
+
+    /**
+     * Filter project settings schema before rendering configure modal.
+     */
+    public function redcap_module_configuration_settings($project_id, $settings)
+    {
+        if ($project_id && !$this->getSystemSetting('allow_project_overrides')) {
+            $keysToRemove = [
+                'override_credentials',
+                'project_qualtrics_api_token',
+                'project_qualtrics_data_center',
+            ];
+
+            $settings = array_values(array_filter($settings, function ($s) use ($keysToRemove) {
+                return !in_array($s['key'] ?? '', $keysToRemove, true);
+            }));
+        }
+
+        return $settings;
     }
 
     /**
@@ -115,7 +135,7 @@ class QualtricsImport extends AbstractExternalModule
 
         // 4. Process each survey response
         foreach ($rawSurveyRows as $rawRow) {
-            $mapped = FieldMapper::mapRecord($rawRow, $config, $fieldNames, $dict);
+            $mapped = FieldMapper::mapRecord($rawRow, $config, $fieldNames, $dict, $projectId);
             if ($mapped === null) {
                 $evaluations[] = [
                     'category' => 'Ineligible / Missing Fields',
@@ -241,11 +261,6 @@ class QualtricsImport extends AbstractExternalModule
         // 5. Commit to REDCap if not dry run
         if (!$isDryRun) {
             $results['commit_results'] = RecordManager::commitImports($projectId, $newRecordsToSave, $noteUpdatesToSave);
-
-            if (!empty($config['trigger_call_log']) && !empty($importedRecordIds)) {
-                $results['call_log_triggered'] = RecordManager::triggerCallLog($projectId, $importedRecordIds);
-            }
-
             $this->setProjectSetting('last_successful_sync_time', gmdate('Y-m-d\TH:i:s\Z'), $projectId);
             $this->log("Qualtrics Import completed for project {$projectId}: " . json_encode($results['counts']));
         }
@@ -258,7 +273,8 @@ class QualtricsImport extends AbstractExternalModule
      */
     public function getQualtricsClient(int $projectId): QualtricsClient
     {
-        $override = (bool)$this->getProjectSetting('override_credentials', $projectId);
+        $allowOverrides = (bool)$this->getSystemSetting('allow_project_overrides');
+        $override = $allowOverrides && (bool)$this->getProjectSetting('override_credentials', $projectId);
 
         $token = $override
             ? $this->getProjectSetting('project_qualtrics_api_token', $projectId)

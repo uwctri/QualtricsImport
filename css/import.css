@@ -1,7 +1,9 @@
-/* Styling for Qualtrics Import Preview UI */
+/* Styling for Qualtrics Import UI */
 .qualtrics-import-container {
     margin-top: 15px;
     margin-bottom: 30px;
+    margin-right: 20px;
+    max-width: 1400px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 

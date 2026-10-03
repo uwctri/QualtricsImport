@@ -13,9 +13,9 @@
     "links": {
         "project": [
             {
-                "name": "Qualtrics Import Preview",
+                "name": "Qualtrics Import",
                 "icon": "fas fa-cloud-download-alt",
-                "url": "pages/preview.php",
+                "url": "pages/import.php",
                 "show-header-and-footer": true
             }
         ]
@@ -121,20 +121,29 @@
         },
         {
             "key": "min_seed_id",
-            "name": "Minimum Seed ID (for Incremental Seed, default: 1000)",
+            "name": "Minimum Seed ID",
             "type": "text",
-            "default": "1000"
+            "default": "1000",
+            "branchingLogic": {
+                "field": "record_id_strategy",
+                "value": "seed_increment"
+            }
         },
         {
             "key": "target_event",
-            "name": "Target Longitudinal Event (leave empty for classic/single-event projects)",
+            "name": "Target Event",
             "type": "event-list"
         },
         {
             "key": "qualtrics_id_field",
             "name": "REDCap Field to store Qualtrics ResponseId",
             "type": "field-list",
-            "default": "qualtrics_id"
+            "default": "qualtrics_id",
+            "branchingLogic": {
+                "field": "record_id_strategy",
+                "op": "!=",
+                "value": "qualtrics_response_id"
+            }
         },
         {
             "key": "dedup_header",
@@ -168,32 +177,8 @@
             "type": "field-list"
         },
         {
-            "key": "case2_last_sim",
-            "name": "Case 2 (Definite Duplicate) Last Name Similarity Threshold (0.0 to 1.0)",
-            "type": "text",
-            "default": "0.85"
-        },
-        {
-            "key": "case2_first_sim",
-            "name": "Case 2 (Definite Duplicate) First Name Similarity Threshold (0.0 to 1.0)",
-            "type": "text",
-            "default": "0.80"
-        },
-        {
-            "key": "case4_last_sim",
-            "name": "Case 4 (Suspected Duplicate) Last Name Similarity Threshold (0.0 to 1.0)",
-            "type": "text",
-            "default": "0.95"
-        },
-        {
-            "key": "case4_first_sim",
-            "name": "Case 4 (Suspected Duplicate) First Name Similarity Threshold (0.0 to 1.0)",
-            "type": "text",
-            "default": "0.90"
-        },
-        {
             "key": "mapping_header",
-            "name": "<strong>Field Mapping & Transformation (Dates and phones are detected and sanitized automatically)</strong>",
+            "name": "<strong>Field Mapping & Transformation</strong>",
             "type": "descriptive"
         },
         {
@@ -201,14 +186,19 @@
             "name": "Field Mapping Mode",
             "type": "dropdown",
             "choices": [
-                { "value": "auto_map_blacklist", "name": "Auto-Map Matching Fields (auto-sanitizes dates & phones, skips metadata and blacklisted fields)" },
+                { "value": "auto_map_blacklist", "name": "Auto-Map Matching Fields (skips metadata and blacklisted fields)" },
                 { "value": "whitelist", "name": "Whitelist Mode (only import fields explicitly specified below)" }
             ],
             "default": "auto_map_blacklist"
         },
         {
+            "key": "only_completed",
+            "name": "Only import completed responses",
+            "type": "checkbox"
+        },
+        {
             "key": "skip_fields",
-            "name": "Skip Fields / Blacklist (comma-separated Qualtrics field names to ignore)",
+            "name": "Blacklist (comma-separated Qualtrics field names to ignore)",
             "type": "text"
         },
         {
@@ -219,7 +209,7 @@
         },
         {
             "key": "filter_logic",
-            "name": "Optional Record Filter Logic (e.g., [screen_score] == '0' or Finished == '1')",
+            "name": "Optional Filter Logic (e.g., [screen_score] = '0')",
             "type": "text"
         },
         {
@@ -246,14 +236,33 @@
             ]
         },
         {
-            "key": "call_log_header",
-            "name": "<strong>Downstream Workflow Integration</strong>",
+            "key": "similarity_thresholds_header",
+            "name": "<strong>Similarity Thresholds</strong><br><span class='text-muted' style='font-weight:normal;'>These control fuzzy name matching between survey submissions and existing records. They typically do not need to be changed.</span>",
             "type": "descriptive"
         },
         {
-            "key": "trigger_call_log",
-            "name": "Trigger Call Log Module Intake Call Generation for Newly Imported Records",
-            "type": "checkbox"
+            "key": "case2_last_sim",
+            "name": "Same Phone: Last Name Match Threshold (0.0 to 1.0)",
+            "type": "text",
+            "default": "0.85"
+        },
+        {
+            "key": "case2_first_sim",
+            "name": "Same Phone: First Name Match Threshold (0.0 to 1.0)",
+            "type": "text",
+            "default": "0.80"
+        },
+        {
+            "key": "case4_last_sim",
+            "name": "Different Phone: Last Name Match Threshold (0.0 to 1.0)",
+            "type": "text",
+            "default": "0.95"
+        },
+        {
+            "key": "case4_first_sim",
+            "name": "Different Phone: First Name Match Threshold (0.0 to 1.0)",
+            "type": "text",
+            "default": "0.90"
         }
     ]
 }

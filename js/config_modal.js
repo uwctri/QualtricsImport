@@ -15,17 +15,25 @@
             ExternalModules.Settings.prototype.resetConfigInstancesOld();
             if ($modal.data('module') !== module.prefix) return;
 
-            // Only show trigger_call_log if Call Log EM is installed
-            const callLogSettingRow = $modal.find('tr[data-key="trigger_call_log"]');
-            const callLogHeaderRow = $modal.find('tr[data-key="call_log_header"]');
 
-            if (!module.isCallLogInstalled) {
-                callLogSettingRow.hide();
-                callLogHeaderRow.hide();
-            } else {
-                callLogSettingRow.show();
-                callLogHeaderRow.show();
+            // Hide credential override options if system setting does not allow project overrides
+            if (!module.allowProjectOverrides) {
+                $modal.find('[field="override_credentials"]').hide();
+                $modal.find('[field="project_qualtrics_api_token"]').hide();
+                $modal.find('[field="project_qualtrics_data_center"]').hide();
             }
+
+            // Hide qualtrics_id_field dropdown if storing ResponseId directly in record_id
+            const updateStrategyVisibility = () => {
+                const strategy = $modal.find('select[name="record_id_strategy"]').val();
+                if (strategy === 'qualtrics_response_id') {
+                    $modal.find('[field="qualtrics_id_field"]').hide();
+                } else {
+                    $modal.find('[field="qualtrics_id_field"]').show();
+                }
+            };
+            $modal.find('select[name="record_id_strategy"]').off('change.strat').on('change.strat', updateStrategyVisibility);
+            updateStrategyVisibility();
         };
     });
 
