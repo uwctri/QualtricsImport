@@ -1,0 +1,115 @@
+/* Styling for Qualtrics Import Preview UI */
+.qualtrics-import-container {
+    margin-top: 15px;
+    margin-bottom: 30px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.qualtrics-card {
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    margin-bottom: 20px;
+}
+
+.qualtrics-card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.qualtrics-card-body {
+    padding: 20px;
+}
+
+.badge-status {
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.badge-clean {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.badge-case-4 {
+    background-color: #cce5ff;
+    color: #004085;
+    border: 1px solid #b8daff;
+}
+
+.badge-case-2 {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.badge-case-3 {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.badge-invalid {
+    background-color: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #d6d8db;
+}
+
+.filter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.filter-pill {
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #ced4da;
+    transition: all 0.2s;
+}
+
+.filter-pill:hover, .filter-pill.active {
+    background-color: #007bff;
+    color: #ffffff;
+    border-color: #007bff;
+}
+
+.filter-pill .badge {
+    margin-left: 5px;
+    background-color: #ffffff;
+    color: #333333;
+}
+
+.filter-pill.active .badge {
+    background-color: rgba(255,255,255,0.9);
+    color: #007bff;
+}
+
+.similarity-score {
+    font-size: 0.8rem;
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.table-preview {
+    font-size: 0.9rem;
+}
+
+.table-preview th {
+    background-color: #f1f3f5;
+    font-weight: 600;
+}

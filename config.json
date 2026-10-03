@@ -1,0 +1,259 @@
+{
+    "name": "Qualtrics Import",
+    "namespace": "UWMadison\\QualtricsImport",
+    "description": "Automated ingestion, deduplication, automatic date/phone sanitization, and record creation from Qualtrics survey screening responses into REDCap.",
+    "authors": [
+        {
+            "name": "Adam Nunez",
+            "email": "adam.Nunez@ctri.wisc.edu",
+            "institution": "UW Madison - Center for Tobacco Research and Intervention"
+        }
+    ],
+    "framework-version": 17,
+    "links": {
+        "project": [
+            {
+                "name": "Qualtrics Import Preview",
+                "icon": "fas fa-cloud-download-alt",
+                "url": "pages/preview.php",
+                "show-header-and-footer": true
+            }
+        ]
+    },
+    "auth-ajax-actions": [
+        "getSurveys",
+        "testConnection",
+        "previewImport",
+        "runImport"
+    ],
+    "crons": [
+        {
+            "cron_name": "qualtrics_import_sync",
+            "cron_description": "Recurring background synchronization of survey responses from Qualtrics into configured REDCap projects",
+            "method": "cronQualtricsImport",
+            "cron_frequency": "3600",
+            "cron_max_run_time": "1800"
+        }
+    ],
+    "system-settings": [
+        {
+            "key": "qualtrics_api_token",
+            "name": "Global Qualtrics API Token",
+            "type": "text"
+        },
+        {
+            "key": "qualtrics_data_center",
+            "name": "Global Qualtrics Data Center (e.g., uwmadison.co1)",
+            "type": "text"
+        },
+        {
+            "key": "allow_project_overrides",
+            "name": "Allow Individual Projects to Override Global Qualtrics Credentials",
+            "type": "checkbox"
+        }
+    ],
+    "project-settings": [
+        {
+            "key": "source_header",
+            "name": "<strong>Qualtrics Connection & Survey Settings</strong>",
+            "type": "descriptive"
+        },
+        {
+            "key": "override_credentials",
+            "name": "Override Global Qualtrics Credentials for this Project",
+            "type": "checkbox"
+        },
+        {
+            "key": "project_qualtrics_api_token",
+            "name": "Project Qualtrics API Token",
+            "type": "text",
+            "branchingLogic": {
+                "field": "override_credentials",
+                "value": "1"
+            }
+        },
+        {
+            "key": "project_qualtrics_data_center",
+            "name": "Project Qualtrics Data Center (e.g., uwmadison.co1)",
+            "type": "text",
+            "branchingLogic": {
+                "field": "override_credentials",
+                "value": "1"
+            }
+        },
+        {
+            "key": "qualtrics_survey_id",
+            "name": "Qualtrics Survey ID (e.g., SV_8CfudJDsw3LwsyG)",
+            "type": "text",
+            "required": true
+        },
+        {
+            "key": "import_enabled",
+            "name": "Enable Automated Background Scheduled Imports",
+            "type": "checkbox"
+        },
+        {
+            "key": "sync_frequency",
+            "name": "Scheduled Sync Frequency",
+            "type": "dropdown",
+            "choices": [
+                { "value": "900", "name": "Every 15 minutes" },
+                { "value": "3600", "name": "Hourly" },
+                { "value": "86400", "name": "Daily" }
+            ],
+            "default": "3600"
+        },
+        {
+            "key": "target_header",
+            "name": "<strong>REDCap Target & Identifier Strategy</strong>",
+            "type": "descriptive"
+        },
+        {
+            "key": "record_id_strategy",
+            "name": "Record ID Generation Strategy",
+            "type": "dropdown",
+            "choices": [
+                { "value": "seed_increment", "name": "Incremental Seed ID (Recommended - max numeric ID + 1)" },
+                { "value": "autonumber", "name": "REDCap Native Auto-Numbering" },
+                { "value": "qualtrics_response_id", "name": "Qualtrics ResponseId directly" }
+            ],
+            "default": "seed_increment"
+        },
+        {
+            "key": "min_seed_id",
+            "name": "Minimum Seed ID (for Incremental Seed, default: 1000)",
+            "type": "text",
+            "default": "1000"
+        },
+        {
+            "key": "target_event",
+            "name": "Target Longitudinal Event (leave empty for classic/single-event projects)",
+            "type": "event-list"
+        },
+        {
+            "key": "qualtrics_id_field",
+            "name": "REDCap Field to store Qualtrics ResponseId",
+            "type": "field-list",
+            "default": "qualtrics_id"
+        },
+        {
+            "key": "dedup_header",
+            "name": "<strong>Deduplication & Screening Rules</strong>",
+            "type": "descriptive"
+        },
+        {
+            "key": "dedup_phone_field",
+            "name": "Primary Phone Field",
+            "type": "field-list",
+            "default": "phone1",
+            "required": true
+        },
+        {
+            "key": "dedup_first_name_field",
+            "name": "First Name Field",
+            "type": "field-list",
+            "default": "first_name",
+            "required": true
+        },
+        {
+            "key": "dedup_last_name_field",
+            "name": "Last Name Field",
+            "type": "field-list",
+            "default": "last_name",
+            "required": true
+        },
+        {
+            "key": "import_notes_field",
+            "name": "Import Notes Field (for duplicate warnings and shared phone notices)",
+            "type": "field-list"
+        },
+        {
+            "key": "case2_last_sim",
+            "name": "Case 2 (Definite Duplicate) Last Name Similarity Threshold (0.0 to 1.0)",
+            "type": "text",
+            "default": "0.85"
+        },
+        {
+            "key": "case2_first_sim",
+            "name": "Case 2 (Definite Duplicate) First Name Similarity Threshold (0.0 to 1.0)",
+            "type": "text",
+            "default": "0.80"
+        },
+        {
+            "key": "case4_last_sim",
+            "name": "Case 4 (Suspected Duplicate) Last Name Similarity Threshold (0.0 to 1.0)",
+            "type": "text",
+            "default": "0.95"
+        },
+        {
+            "key": "case4_first_sim",
+            "name": "Case 4 (Suspected Duplicate) First Name Similarity Threshold (0.0 to 1.0)",
+            "type": "text",
+            "default": "0.90"
+        },
+        {
+            "key": "mapping_header",
+            "name": "<strong>Field Mapping & Transformation (Dates and phones are detected and sanitized automatically)</strong>",
+            "type": "descriptive"
+        },
+        {
+            "key": "mapping_mode",
+            "name": "Field Mapping Mode",
+            "type": "dropdown",
+            "choices": [
+                { "value": "auto_map_blacklist", "name": "Auto-Map Matching Fields (auto-sanitizes dates & phones, skips metadata and blacklisted fields)" },
+                { "value": "whitelist", "name": "Whitelist Mode (only import fields explicitly specified below)" }
+            ],
+            "default": "auto_map_blacklist"
+        },
+        {
+            "key": "skip_fields",
+            "name": "Skip Fields / Blacklist (comma-separated Qualtrics field names to ignore)",
+            "type": "text"
+        },
+        {
+            "key": "required_fields",
+            "name": "Required REDCap Fields (comma-separated; candidate skipped if any of these are empty)",
+            "type": "text",
+            "default": "phone1,first_name,last_name"
+        },
+        {
+            "key": "filter_logic",
+            "name": "Optional Record Filter Logic (e.g., [screen_score] == '0' or Finished == '1')",
+            "type": "text"
+        },
+        {
+            "key": "custom_value_mappings",
+            "name": "Custom Choice / Value Mappings",
+            "type": "sub_settings",
+            "repeatable": true,
+            "sub_settings": [
+                {
+                    "key": "qualtrics_field",
+                    "name": "Qualtrics Field Name",
+                    "type": "text"
+                },
+                {
+                    "key": "redcap_field",
+                    "name": "Target REDCap Field",
+                    "type": "field-list"
+                },
+                {
+                    "key": "value_map_json",
+                    "name": "Value Mapping JSON (e.g., {\"1\": \"0\", \"2\": \"1\"})",
+                    "type": "text"
+                }
+            ]
+        },
+        {
+            "key": "call_log_header",
+            "name": "<strong>Downstream Workflow Integration</strong>",
+            "type": "descriptive"
+        },
+        {
+            "key": "trigger_call_log",
+            "name": "Trigger Call Log Module Intake Call Generation for Newly Imported Records",
+            "type": "checkbox"
+        }
+    ]
+}

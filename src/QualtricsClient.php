@@ -1,0 +1,269 @@
+<?php
+
+namespace UWMadison\QualtricsImport;
+
+use Exception;
+use ZipArchive;
+
+class QualtricsClient
+{
+    private string $apiToken;
+    private string $dataCenter;
+    private string $baseUrl;
+
+    public function __construct(string $apiToken, string $dataCenter)
+    {
+        $this->apiToken = trim($apiToken);
+        $this->dataCenter = trim($dataCenter);
+        $this->baseUrl = sprintf('https://%s.qualtrics.com/API/v3/', $this->dataCenter);
+    }
+
+    /**
+     * Test connection to Qualtrics API.
+     * Returns array ['success' => bool, 'message' => string].
+     */
+    public function testConnection(): array
+    {
+        try {
+            $response = $this->request('GET', 'surveys?limit=1');
+            if (isset($response['result'])) {
+                return ['success' => true, 'message' => 'Connected successfully to Qualtrics API.'];
+            }
+            return ['success' => false, 'message' => 'Qualtrics returned unexpected response structure.'];
+        } catch (Exception $e) {
+            return ['success' => false, 'message' => 'Connection failed: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Retrieve list of accessible surveys from Qualtrics.
+     * Returns array of ['id' => 'SV_...', 'name' => '...'].
+     */
+    public function getSurveys(): array
+    {
+        $response = $this->request('GET', 'surveys');
+        $elements = $response['result']['elements'] ?? [];
+        $surveys = [];
+        foreach ($elements as $el) {
+            $surveys[] = [
+                'id' => $el['id'] ?? '',
+                'name' => $el['name'] ?? '',
+                'isActive' => $el['isActive'] ?? false,
+            ];
+        }
+        return $surveys;
+    }
+
+    /**
+     * Perform asynchronous export of survey responses from Qualtrics.
+     *
+     * @param string $surveyId Qualtrics Survey ID (e.g., SV_...)
+     * @param string|null $startDate Optional ISO 8601 date string for delta sync
+     * @return array Array of survey response rows
+     */
+    public function exportResponses(string $surveyId, ?string $startDate = null): array
+    {
+        $payload = [
+            'format' => 'json',
+            'compress' => true,
+        ];
+        if (!empty($startDate)) {
+            $payload['startDate'] = $startDate;
+        }
+
+        // Step 1: Initiate export job
+        $initRes = $this->request('POST', "surveys/{$surveyId}/export-responses", $payload);
+        $progressId = $initRes['result']['progressId'] ?? null;
+        if (empty($progressId)) {
+            throw new Exception("Qualtrics export initiation failed: progressId not returned.");
+        }
+
+        // Step 2: Poll progress until complete (with timeout safety)
+        $maxAttempts = 40;
+        $attempt = 0;
+        $isComplete = false;
+        $fileId = null;
+
+        while ($attempt < $maxAttempts) {
+            usleep(1000000); // 1.0 second delay between checks
+            $attempt++;
+
+            $progressRes = $this->request('GET', "surveys/{$surveyId}/export-responses/{$progressId}");
+            $status = $progressRes['result']['status'] ?? '';
+            $percent = $progressRes['result']['percentComplete'] ?? 0;
+
+            if ($status === 'complete' || $percent >= 100) {
+                $isComplete = true;
+                $fileId = $progressRes['result']['fileId'] ?? null;
+                break;
+            }
+
+            if ($status === 'failed') {
+                throw new Exception("Qualtrics export job failed on remote server.");
+            }
+        }
+
+        if (!$isComplete) {
+            throw new Exception("Qualtrics export timed out after {$maxAttempts} seconds.");
+        }
+
+        // Step 3: Download exported file
+        $downloadEndpoint = $fileId
+            ? "surveys/{$surveyId}/export-responses/{$fileId}/file"
+            : "surveys/{$surveyId}/export-responses/{$progressId}/file";
+
+        $zipData = $this->downloadFile($downloadEndpoint);
+        if (empty($zipData)) {
+            throw new Exception("Downloaded Qualtrics export file was empty.");
+        }
+
+        // Step 4: Decompress ZIP and parse JSON
+        return $this->extractResponsesFromZip($zipData);
+    }
+
+    /**
+     * Unpack ZIP archive in memory and parse JSON responses.
+     */
+    private function extractResponsesFromZip(string $zipContent): array
+    {
+        $tempZip = tempnam(sys_get_temp_dir(), 'qtr_');
+        file_put_contents($tempZip, $zipContent);
+
+        $zip = new ZipArchive();
+        if ($zip->open($tempZip) !== true) {
+            @unlink($tempZip);
+            throw new Exception("Failed to open downloaded Qualtrics export ZIP archive.");
+        }
+
+        $jsonStr = '';
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $filename = $zip->getNameIndex($i);
+            if (str_ends_with(strtolower($filename), '.json')) {
+                $jsonStr = $zip->getFromIndex($i);
+                break;
+            }
+        }
+        $zip->close();
+        @unlink($tempZip);
+
+        if (empty($jsonStr)) {
+            throw new Exception("No JSON file found in Qualtrics export archive.");
+        }
+
+        $decoded = json_decode($jsonStr, true);
+        if (!is_array($decoded)) {
+            throw new Exception("Failed to decode JSON response from Qualtrics export.");
+        }
+
+        $rawResponses = $decoded['responses'] ?? $decoded;
+        $normalizedRows = [];
+
+        foreach ($rawResponses as $idx => $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            // Qualtrics v3 JSON format often nests survey answer fields under 'values'
+            $row = [];
+            if (isset($item['values']) && is_array($item['values'])) {
+                $row = $item['values'];
+                if (isset($item['responseId'])) {
+                    $row['ResponseId'] = $item['responseId'];
+                }
+            } else {
+                $row = $item;
+            }
+
+            // Ensure ResponseId is set
+            if (!isset($row['ResponseId']) && isset($item['responseId'])) {
+                $row['ResponseId'] = $item['responseId'];
+            }
+
+            // Skip header row if labeled as header
+            $respId = (string)($row['ResponseId'] ?? '');
+            if (!empty($respId) && str_starts_with($respId, 'R_')) {
+                $normalizedRows[] = $row;
+            }
+        }
+
+        return $normalizedRows;
+    }
+
+    /**
+     * Execute standard Qualtrics API v3 HTTP request.
+     */
+    private function request(string $method, string $endpoint, ?array $body = null): array
+    {
+        $url = $this->baseUrl . ltrim($endpoint, '/');
+        $ch = curl_init();
+
+        $headers = [
+            'X-API-TOKEN: ' . $this->apiToken,
+            'Accept: application/json',
+        ];
+
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+
+        if (strtoupper($method) === 'POST') {
+            curl_setopt($ch, CURLOPT_POST, true);
+            if ($body !== null) {
+                $jsonBody = json_encode($body);
+                $headers[] = 'Content-Type: application/json';
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonBody);
+            }
+        }
+
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+        $rawResponse = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($rawResponse === false) {
+            throw new Exception("Qualtrics API request error: " . $curlError);
+        }
+
+        $decoded = json_decode($rawResponse, true);
+        if ($httpCode >= 400) {
+            $msg = $decoded['meta']['error']['errorMessage'] ?? "HTTP Error {$httpCode}";
+            throw new Exception("Qualtrics API Error: {$msg}");
+        }
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Download binary file from Qualtrics API.
+     */
+    private function downloadFile(string $endpoint): string
+    {
+        $url = $this->baseUrl . ltrim($endpoint, '/');
+        $ch = curl_init();
+
+        $headers = [
+            'X-API-TOKEN: ' . $this->apiToken,
+            'Accept: application/octet-stream',
+        ];
+
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+
+        $binaryData = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($binaryData === false || $httpCode >= 400) {
+            throw new Exception("Failed to download Qualtrics export file (HTTP {$httpCode}): {$curlError}");
+        }
+
+        return $binaryData;
+    }
+}
