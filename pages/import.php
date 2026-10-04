@@ -31,7 +31,31 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                 <span><strong>Last Sync:</strong> <?= htmlspecialchars($lastSync ?: 'None') ?></span>
             </div>
         </div>
-        <div class="d-flex align-items-center mt-2 mt-md-0">
+    </div>
+
+    <!-- Controls Toolbar -->
+    <div class="qualtrics-card mb-3 p-2 px-3 bg-light d-flex align-items-center justify-content-between flex-wrap">
+        <div class="d-flex align-items-center flex-wrap">
+            <div class="d-flex align-items-center mr-3 my-1">
+                <label for="previewSince" class="mb-0 mr-2 font-weight-bold text-secondary small"><i class="far fa-calendar-alt"></i> Date Range:</label>
+                <select id="previewSince" class="form-control form-control-sm" style="width: auto;">
+                    <option value="auto" selected>Auto (Past 24h or Last Import)</option>
+                    <option value="past_24h">Past 24 Hours</option>
+                    <?php if (!empty($lastSync)): ?>
+                    <option value="last_sync">Since Last Import (<?= htmlspecialchars($lastSync) ?>)</option>
+                    <?php endif; ?>
+                    <option value="past_7d">Past 7 Days</option>
+                    <option value="past_30d">Past 30 Days</option>
+                    <option value="all">All Time (No Date Filter)</option>
+                </select>
+            </div>
+            <div class="d-flex align-items-center mr-3 my-1">
+                <label for="previewLimit" class="mb-0 mr-2 font-weight-bold text-secondary small"><i class="fas fa-list-ol"></i> Limit:</label>
+                <input type="number" id="previewLimit" class="form-control form-control-sm" value="1000" min="1" max="10000" style="width: 90px;" title="Maximum responses to evaluate (default 1000)">
+            </div>
+            <div id="previewScopeNotice" class="my-1"></div>
+        </div>
+        <div class="d-flex align-items-center my-1">
             <button id="btnRefresh" class="btn btn-outline-secondary mr-2" <?= !$hasSurveyId ? 'disabled' : '' ?>>
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>

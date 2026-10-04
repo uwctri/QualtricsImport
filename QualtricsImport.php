@@ -52,12 +52,33 @@ class QualtricsImport extends AbstractExternalModule
      */
     public function redcap_module_ajax($action, $payload, $project_id)
     {
+        $limit = isset($payload['limit']) ? max(1, min(10000, (int)$payload['limit'])) : 1000;
+        $sinceType = (string)($payload['sinceType'] ?? 'auto');
+        $customStartDate = !empty($payload['startDate']) ? (string)$payload['startDate'] : null;
+
         return match ($action) {
             'testConnection' => $this->getQualtricsClient($project_id)->testConnection(),
             'getSurveys' => ['success' => true, 'surveys' => $this->getQualtricsClient($project_id)->getSurveys()],
-            'previewImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, true)],
-            'runImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, false)],
+            'previewImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, true, false, $limit, $sinceType, $customStartDate)],
+            'runImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, false, false, $limit, $sinceType, $customStartDate)],
         };
+    }
+
+    /**
+     * Resolve effective startDate for Qualtrics export based on sinceType and project history.
+     */
+    public function resolveStartDate(int $projectId, string $sinceType = 'auto'): ?string
+    {
+        $lastSyncTime = (string)$this->getProjectSetting('last_successful_sync_time', $projectId);
+        return self::calculateStartDate($sinceType, $lastSyncTime);
+    }
+
+    /**
+     * Calculate effective startDate string from sinceType and lastSyncTime.
+     */
+    public static function calculateStartDate(string $sinceType = 'auto', ?string $lastSyncTime = null, ?int $currentTime = null): ?string
+    {
+        return QualtricsClient::calculateStartDate($sinceType, $lastSyncTime, $currentTime);
     }
 
     /**
@@ -95,8 +116,14 @@ class QualtricsImport extends AbstractExternalModule
     /**
      * Main execution pipeline for both dry-run preview and live import.
      */
-    public function executeImportPipeline(int $projectId, bool $isDryRun = false, bool $isCron = false): array
-    {
+    public function executeImportPipeline(
+        int $projectId,
+        bool $isDryRun = false,
+        bool $isCron = false,
+        ?int $limit = 1000,
+        ?string $sinceType = 'auto',
+        ?string $customStartDate = null
+    ): array {
         $today = date('Y-m-d');
         $config = $this->getProjectSettings($projectId);
         $surveyId = trim($config['qualtrics_survey_id'] ?? '');
@@ -107,8 +134,20 @@ class QualtricsImport extends AbstractExternalModule
 
         // 1. Fetch survey responses from Qualtrics
         $client = $this->getQualtricsClient($projectId);
-        $lastSyncTime = (!$isDryRun && $isCron) ? $this->getProjectSetting('last_successful_sync_time', $projectId) : null;
-        $rawSurveyRows = $client->exportResponses($surveyId, $lastSyncTime);
+        if ($isCron) {
+            $startDate = $this->getProjectSetting('last_successful_sync_time', $projectId);
+        } elseif ($customStartDate !== null) {
+            $startDate = $customStartDate;
+        } else {
+            $startDate = $this->resolveStartDate($projectId, $sinceType ?? 'auto');
+        }
+
+        $rawSurveyRows = $client->exportResponses($surveyId, $startDate);
+        $totalRetrieved = count($rawSurveyRows);
+
+        if ($limit !== null && $limit > 0 && $totalRetrieved > $limit) {
+            $rawSurveyRows = array_slice($rawSurveyRows, 0, $limit);
+        }
 
         // 2. Fetch existing records and metadata from REDCap
         $poolRecords = RecordManager::fetchExistingRecords($projectId, $config);
@@ -274,7 +313,10 @@ class QualtricsImport extends AbstractExternalModule
 
         $results = [
             'is_dry_run' => $isDryRun,
-            'survey_rows_retrieved' => count($rawSurveyRows),
+            'start_date_used' => $startDate,
+            'survey_rows_retrieved' => $totalRetrieved,
+            'survey_rows_evaluated' => count($rawSurveyRows),
+            'limit_applied' => ($limit !== null && $totalRetrieved > $limit) ? $limit : null,
             'ready_to_import_count' => count($newRecordsToSave),
             'note_updates_count' => count($noteUpdatesToSave),
             'counts' => $categoryCounts,

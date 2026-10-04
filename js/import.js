@@ -83,6 +83,13 @@
         $('#cntExcluded').text((counts.case_1_existing_id || 0) + (counts.invalid_phone || 0) + (counts.missing_required || 0));
     };
 
+    const getPreviewParams = () => {
+        let limit = parseInt($('#previewLimit').val(), 10);
+        if (isNaN(limit) || limit < 1) limit = 1000;
+        const sinceType = $('#previewSince').val() || 'auto';
+        return { limit, sinceType };
+    };
+
     const showStatusAlert = (message, type = 'info') => {
         const alertHtml = `
             <div class="alert alert-${type} alert-dismissible fade show mb-3" role="alert">
@@ -106,8 +113,11 @@
         $('#previewLoading').show();
         $('#previewContent').hide();
         $('#btnRunImport').prop('disabled', true);
+        $('#previewScopeNotice').empty();
 
-        module.ajax('previewImport', {})
+        const params = getPreviewParams();
+
+        module.ajax('previewImport', params)
             .then(res => {
                 $('#previewLoading').hide();
                 $('#previewContent').show();
@@ -120,6 +130,15 @@
                 currentData = res.data;
                 updateCounts(currentData.counts || {}, currentData.evaluations ? currentData.evaluations.length : 0);
                 renderTable(currentData.evaluations || []);
+
+                if (currentData.limit_applied) {
+                    $('#previewScopeNotice').html(`<span class="badge badge-warning text-dark"><i class="fas fa-exclamation-triangle"></i> Capped at ${currentData.limit_applied.toLocaleString()} of ${currentData.survey_rows_retrieved.toLocaleString()} responses</span>`);
+                } else if (currentData.start_date_used) {
+                    const d = new Date(currentData.start_date_used);
+                    $('#previewScopeNotice').html(`<span class="text-muted small"><i class="far fa-clock"></i> Since: ${d.toLocaleDateString()} ${d.toLocaleTimeString()} (${currentData.survey_rows_evaluated || 0} evaluated)</span>`);
+                } else {
+                    $('#previewScopeNotice').html(`<span class="text-muted small"><i class="fas fa-infinity"></i> All time (${currentData.survey_rows_evaluated || 0} evaluated)</span>`);
+                }
 
                 const readyCount = (currentData.counts.clean_new || 0) + (currentData.counts.case_4_suspected || 0);
                 if (readyCount > 0 || currentData.note_updates_count > 0) {
@@ -142,7 +161,9 @@
         $('#btnRefresh').prop('disabled', true);
         $('#importAlertArea').empty();
 
-        module.ajax('runImport', {})
+        const params = getPreviewParams();
+
+        module.ajax('runImport', params)
             .then(res => {
                 $('#btnRunImport').html('<i class="fas fa-play"></i> Run Import Now');
                 $('#btnRefresh').prop('disabled', false);
@@ -167,6 +188,16 @@
     };
 
     $(document).ready(() => {
+        // Restore remembered limit if present
+        try {
+            const savedLimit = localStorage.getItem('qualtrics_import_preview_limit');
+            if (savedLimit) {
+                $('#previewLimit').val(savedLimit);
+            }
+        } catch (e) {
+            // Ignore localStorage errors
+        }
+
         // Event handlers
         $('#btnRefresh').on('click', () => {
             loadPreview();
@@ -174,6 +205,19 @@
 
         $('#btnRunImport').on('click', () => {
             runLiveImport();
+        });
+
+        $('#previewSince').on('change', () => {
+            loadPreview();
+        });
+
+        $('#previewLimit').on('change', function() {
+            try {
+                localStorage.setItem('qualtrics_import_preview_limit', $(this).val());
+            } catch (e) {
+                // Ignore localStorage errors
+            }
+            loadPreview();
         });
 
         $('.filter-pill').on('click', function() {

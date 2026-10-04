@@ -19,6 +19,31 @@ class QualtricsClient
     }
 
     /**
+     * Calculate effective ISO 8601 startDate string from sinceType and lastSyncTime.
+     */
+    public static function calculateStartDate(string $sinceType = 'auto', ?string $lastSyncTime = null, ?int $currentTime = null): ?string
+    {
+        $now = $currentTime ?? time();
+        $lastSyncTimestamp = (!empty($lastSyncTime) && strtotime($lastSyncTime) !== false) ? strtotime($lastSyncTime) : null;
+
+        return match ($sinceType) {
+            'past_24h' => gmdate('Y-m-d\TH:i:s\Z', $now - 86400),
+            'last_sync' => $lastSyncTimestamp ? gmdate('Y-m-d\TH:i:s\Z', $lastSyncTimestamp) : gmdate('Y-m-d\TH:i:s\Z', $now - 86400),
+            'past_7d' => gmdate('Y-m-d\TH:i:s\Z', $now - (7 * 86400)),
+            'past_30d' => gmdate('Y-m-d\TH:i:s\Z', $now - (30 * 86400)),
+            'all' => null,
+            default => (function () use ($now, $lastSyncTimestamp) {
+                // Default: past day (24h) or last import, whichever is less (smaller window / more recent timestamp)
+                $pastDayTimestamp = $now - 86400;
+                $effectiveTimestamp = ($lastSyncTimestamp !== null)
+                    ? max($pastDayTimestamp, $lastSyncTimestamp)
+                    : $pastDayTimestamp;
+                return gmdate('Y-m-d\TH:i:s\Z', $effectiveTimestamp);
+            })(),
+        };
+    }
+
+    /**
      * Test connection to Qualtrics API.
      * Returns array ['success' => bool, 'message' => string].
      */
