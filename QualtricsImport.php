@@ -5,6 +5,7 @@ namespace UWMadison\QualtricsImport;
 use ExternalModules\AbstractExternalModule;
 use REDCap;
 use Exception;
+use Throwable;
 
 require_once __DIR__ . '/src/AutoSanitizer.php';
 require_once __DIR__ . '/src/Deduplicator.php';
@@ -88,26 +89,37 @@ class QualtricsImport extends AbstractExternalModule
     {
         $processedCount = 0;
         foreach ($this->getProjectsWithModuleEnabled() as $pid) {
-            if (!$this->getProjectSetting('import_enabled', $pid)) {
+            $projectId = (int)$pid;
+            if (!$this->getProjectSetting('import_enabled', $projectId)) {
                 continue;
             }
 
-            $surveyId = $this->getProjectSetting('qualtrics_survey_id', $pid);
-            if (empty($surveyId)) {
+            $surveyId = trim((string)$this->getProjectSetting('qualtrics_survey_id', $projectId));
+            if ($surveyId === '') {
+                // Silently skip if survey ID is not configured (no error logging)
                 continue;
             }
 
-            $frequency = (int)($this->getProjectSetting('sync_frequency', $pid) ?: 3600);
-            $lastRun = (int)$this->getProjectSetting('last_cron_run_timestamp', $pid);
+            if (!$this->hasQualtricsCredentials($projectId)) {
+                // Silently skip if credentials are not configured (no error logging)
+                continue;
+            }
+
+            $frequency = (int)($this->getProjectSetting('sync_frequency', $projectId) ?: 3600);
+            $lastRun = (int)$this->getProjectSetting('last_cron_run_timestamp', $projectId);
             $now = time();
 
             if (($now - $lastRun) < $frequency) {
                 continue;
             }
 
-            $this->executeImportPipeline($pid, false, true);
-            $this->setProjectSetting('last_cron_run_timestamp', $now, $pid);
-            $processedCount++;
+            try {
+                $this->executeImportPipeline($projectId, false, true);
+                $this->setProjectSetting('last_cron_run_timestamp', $now, $projectId);
+                $processedCount++;
+            } catch (Throwable) {
+                // Silently skip any errors during cron to prevent nuisance PHP error logs
+            }
         }
 
         return "Qualtrics Import cron completed. Synchronized {$processedCount} projects.";
@@ -126,10 +138,37 @@ class QualtricsImport extends AbstractExternalModule
     ): array {
         $today = date('Y-m-d');
         $config = $this->getProjectSettings($projectId);
-        $surveyId = trim($config['qualtrics_survey_id'] ?? '');
+        $surveyId = trim((string)($config['qualtrics_survey_id'] ?? ''));
 
-        if (empty($surveyId)) {
-            throw new Exception("Qualtrics Survey ID is not configured for this project.");
+        $emptyResponse = [
+            'is_dry_run' => $isDryRun,
+            'start_date_used' => null,
+            'survey_rows_retrieved' => 0,
+            'survey_rows_evaluated' => 0,
+            'limit_applied' => null,
+            'ready_to_import_count' => 0,
+            'note_updates_count' => 0,
+            'counts' => [
+                'clean_new' => 0,
+                'case_4_suspected' => 0,
+                'case_2_duplicate' => 0,
+                'case_3_household' => 0,
+                'case_1_existing_id' => 0,
+                'invalid_phone' => 0,
+                'missing_required' => 0,
+            ],
+            'evaluations' => [],
+            'timestamp' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($surveyId === '') {
+            $emptyResponse['message'] = 'Qualtrics Survey ID is not configured.';
+            return $emptyResponse;
+        }
+
+        if (!$this->hasQualtricsCredentials($projectId)) {
+            $emptyResponse['message'] = 'Qualtrics credentials (token and data center) are not configured.';
+            return $emptyResponse;
         }
 
         // 1. Fetch survey responses from Qualtrics
@@ -337,6 +376,25 @@ class QualtricsImport extends AbstractExternalModule
         }
 
         return $results;
+    }
+
+    /**
+     * Check whether Qualtrics API credentials (token and data center) are configured.
+     */
+    public function hasQualtricsCredentials(int $projectId): bool
+    {
+        $allowOverrides = (bool)$this->getSystemSetting('allow_project_overrides');
+        $override = $allowOverrides && (bool)$this->getProjectSetting('override_credentials', $projectId);
+
+        $token = $override
+            ? $this->getProjectSetting('project_qualtrics_api_token', $projectId)
+            : $this->getSystemSetting('qualtrics_api_token');
+
+        $dataCenter = $override
+            ? $this->getProjectSetting('project_qualtrics_data_center', $projectId)
+            : $this->getSystemSetting('qualtrics_data_center');
+
+        return !empty($token) && !empty($dataCenter);
     }
 
     /**
