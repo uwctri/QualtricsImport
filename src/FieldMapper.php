@@ -215,12 +215,13 @@ class FieldMapper
         }
         if (!empty($missing)) {
             $completeness = self::analyzeResponseCompleteness($rawRow);
+            $missingText = 'Missing required field(s): ' . implode(', ', $missing);
             if ($completeness['status'] === 'completely_blank') {
-                $exclusionReason = 'Response was completely blank (missing required field(s): ' . implode(', ', $missing) . ')';
+                $exclusionReason = "Response was completely blank. {$missingText}";
             } elseif ($completeness['status'] === 'mostly_blank') {
-                $exclusionReason = 'Response was mostly blank (' . $completeness['summary'] . '; missing required field(s): ' . implode(', ', $missing) . ')';
+                $exclusionReason = "{$completeness['summary']}. {$missingText}";
             } else {
-                $exclusionReason = 'Missing required field(s): ' . implode(', ', $missing);
+                $exclusionReason = $missingText;
             }
             return null;
         }
@@ -597,15 +598,12 @@ class FieldMapper
         $metadataLower['resolution'] = true;
         $metadataLower['_recordid'] = true;
 
-        $totalQuestions = 0;
         $answeredCount = 0;
-
         foreach ($rawRow as $key => $val) {
             $kLower = strtolower(trim((string)$key));
             if (isset($metadataLower[$kLower])) {
                 continue;
             }
-            $totalQuestions++;
             if ($val !== null && trim((string)$val) !== '') {
                 $answeredCount++;
             }
@@ -618,32 +616,28 @@ class FieldMapper
             $progress = (int)$rawRow['progress'];
         }
 
-        if ($answeredCount === 0) {
+        // 1. Completely blank: no question answers, or explicit 0% progress with 0 answers
+        if ($answeredCount === 0 || ($progress !== null && $progress === 0 && $answeredCount === 0)) {
             return [
                 'status' => 'completely_blank',
                 'answered_count' => 0,
-                'total_questions' => $totalQuestions,
                 'progress' => $progress,
-                'summary' => 'completely blank (0 survey questions answered)',
+                'summary' => 'Response was completely blank',
             ];
         }
 
-        // Mostly blank if 2 or fewer questions answered, or <= 15% answered (for surveys with >= 5 questions),
-        // or if Progress is <= 15%
-        $isMostlyBlank = ($answeredCount <= 2)
-            || ($totalQuestions >= 5 && ($answeredCount / $totalQuestions) <= 0.15)
-            || ($progress !== null && $progress > 0 && $progress <= 15);
+        // 2. Mostly blank: low progress (<= 25%) or only 1-2 questions answered when progress is unknown
+        $isMostlyBlank = ($progress !== null && $progress > 0 && $progress <= 25)
+            || ($progress === null && $answeredCount <= 2);
 
         if ($isMostlyBlank) {
-            $summary = "mostly blank ({$answeredCount} of {$totalQuestions} questions answered";
-            if ($progress !== null) {
-                $summary .= ", {$progress}% progress";
+            $summary = 'Response was mostly blank';
+            if ($progress !== null && $progress > 0) {
+                $summary .= " ({$progress}% progress)";
             }
-            $summary .= ')';
             return [
                 'status' => 'mostly_blank',
                 'answered_count' => $answeredCount,
-                'total_questions' => $totalQuestions,
                 'progress' => $progress,
                 'summary' => $summary,
             ];
@@ -652,9 +646,8 @@ class FieldMapper
         return [
             'status' => 'answered',
             'answered_count' => $answeredCount,
-            'total_questions' => $totalQuestions,
             'progress' => $progress,
-            'summary' => "{$answeredCount} of {$totalQuestions} questions answered",
+            'summary' => ($progress !== null) ? "{$progress}% progress" : '',
         ];
     }
 }
