@@ -227,6 +227,7 @@ class QualtricsImport extends AbstractExternalModule
         // 4. Process each survey response
         foreach ($rawSurveyRows as $rawRow) {
             $respId = (string)($rawRow['ResponseId'] ?? '');
+            $startDate = (string)($rawRow['StartDate'] ?? $rawRow['startdate'] ?? $rawRow['RecordedDate'] ?? '');
 
             // Pre-check Case 1: Already imported by Qualtrics ResponseId
             $alreadyImported = null;
@@ -246,6 +247,7 @@ class QualtricsImport extends AbstractExternalModule
                     'status' => 'skipped_case_1',
                     'description' => "Qualtrics ResponseId '{$respId}' already exists in REDCap record {$alreadyImported['record_id']}",
                     'qualtrics_id' => $respId,
+                    'start_date' => $startDate,
                     'candidate_name' => trim("{$alreadyImported['first_name']} {$alreadyImported['last_name']}"),
                     'candidate_phone' => $alreadyImported['phone1'],
                     'record_id' => null,
@@ -278,6 +280,7 @@ class QualtricsImport extends AbstractExternalModule
                     'status' => 'skipped_ineligible',
                     'description' => $exclusionReason ?: 'Response excluded by filter logic or missing required fields',
                     'qualtrics_id' => $respId,
+                    'start_date' => $startDate,
                     'candidate_name' => $previewInfo['name'],
                     'candidate_phone' => $previewInfo['phone'],
                     'record_id' => null,
@@ -306,6 +309,7 @@ class QualtricsImport extends AbstractExternalModule
                 'status' => $eval['status'],
                 'description' => $eval['description'],
                 'qualtrics_id' => $mapped['qualtrics_id'],
+                'start_date' => $startDate,
                 'candidate_name' => $mapped['display_name'],
                 'candidate_phone' => $mapped['phone1'],
                 'record_id' => null,
@@ -316,7 +320,7 @@ class QualtricsImport extends AbstractExternalModule
             // If response was mostly blank, append to decision reason and candidate notes
             $completeness = FieldMapper::analyzeResponseCompleteness($rawRow);
             if ($completeness['status'] === 'mostly_blank') {
-                $blankNote = "Response was mostly blank ({$completeness['summary']})";
+                $blankNote = $completeness['summary'];
                 $evalSummary['description'] = ($evalSummary['description'] !== '')
                     ? "{$evalSummary['description']} [{$blankNote}]"
                     : $blankNote;

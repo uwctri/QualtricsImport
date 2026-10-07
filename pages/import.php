@@ -168,12 +168,13 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                 <table class="table table-hover table-striped table-preview mb-0">
                     <thead>
                         <tr>
-                            <th class="sortable" data-sort="status" style="width: 135px;">Status <i class="fas fa-sort sort-icon"></i></th>
-                            <th class="sortable" data-sort="name">Candidate Name <i class="fas fa-sort sort-icon"></i></th>
-                            <th class="sortable" data-sort="phone">Phone <i class="fas fa-sort sort-icon"></i></th>
-                            <th class="sortable" data-sort="qualtrics_id">Qualtrics ID <i class="fas fa-sort sort-icon"></i></th>
-                            <th class="sortable" data-sort="record_id">Target Record ID <i class="fas fa-sort sort-icon"></i></th>
-                            <th class="sortable" data-sort="matched">Matched Record / Score <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable text-nowrap" data-sort="status" style="width: 110px;">Status <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable text-nowrap" data-sort="start_date" style="width: 125px;">Date <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable text-nowrap" data-sort="name" style="width: 140px;">Candidate Name <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable text-nowrap" data-sort="phone" style="width: 115px;">Phone <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable text-nowrap" data-sort="qualtrics_id" style="width: 110px;">Qualtrics ID <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable text-nowrap" data-sort="record_id" style="width: 85px;">Record ID <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable text-nowrap" data-sort="matched" style="width: 130px;">Matched / Score <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable" data-sort="description">Decision Reason / Notes <i class="fas fa-sort sort-icon"></i></th>
                         </tr>
                     </thead>

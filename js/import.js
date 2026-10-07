@@ -35,6 +35,15 @@
         return phone;
     };
 
+    const formatStartDate = (dt) => {
+        if (!dt) return '-';
+        const cleaned = String(dt).replace('T', ' ').replace(/Z$/, '').trim();
+        if (cleaned.length >= 16) {
+            return cleaned.substring(0, 16);
+        }
+        return cleaned;
+    };
+
     const getBadgeHtml = (status, category) => {
         let badgeClass = 'badge-clean';
         if (status === 'skipped_case_2') badgeClass = 'badge-case-2';
@@ -94,6 +103,7 @@
                 const searchCorpus = [
                     item.category || '',
                     item.status || '',
+                    item.start_date || '',
                     item.candidate_name || '',
                     item.candidate_phone || '',
                     item.qualtrics_id || '',
@@ -112,6 +122,9 @@
                 switch (sortColumn) {
                     case 'status':
                         comp = (a.category || '').localeCompare(b.category || '', undefined, { sensitivity: 'base' });
+                        break;
+                    case 'start_date':
+                        comp = (a.start_date || '').localeCompare(b.start_date || '');
                         break;
                     case 'name':
                         comp = (a.candidate_name || '').localeCompare(b.candidate_name || '', undefined, { sensitivity: 'base' });
@@ -155,7 +168,7 @@
             const msg = searchTerm
                 ? `No records matching "<strong>${$('<div>').text(searchTerm).html()}</strong>"`
                 : 'No records found for selected status filter.';
-            $tbody.html(`<tr><td colspan="7" class="text-center text-muted p-4">${msg}</td></tr>`);
+            $tbody.html(`<tr><td colspan="8" class="text-center text-muted p-4">${msg}</td></tr>`);
             return;
         }
 
@@ -171,8 +184,9 @@
             const tr = `
                 <tr>
                     <td>${getBadgeHtml(row.status, row.category)}</td>
+                    <td class="text-nowrap"><small>${formatStartDate(row.start_date)}</small></td>
                     <td><strong>${row.candidate_name || '-'}</strong></td>
-                    <td>${formatPhone(row.candidate_phone)}</td>
+                    <td class="text-nowrap">${formatPhone(row.candidate_phone)}</td>
                     <td><small class="text-muted">${row.qualtrics_id}</small></td>
                     <td>${allocatedId}</td>
                     <td>${matchedRecord} ${scoresHtml !== '-' ? '<br>' + scoresHtml : ''}</td>
