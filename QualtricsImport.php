@@ -323,6 +323,7 @@ class QualtricsImport extends AbstractExternalModule
             }
             if (!isset($mapped['first_import_date'])) {
                 $mapped['first_import_date'] = $today;
+            }
 
 
             if (!empty($eval['candidate_note']) && !empty($config['import_notes_field'])) {
