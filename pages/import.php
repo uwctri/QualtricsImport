@@ -80,62 +80,72 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
             <div class="d-flex align-items-center mb-2 mb-md-0">
                 <div class="dropdown status-filter-dropdown mr-2">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="statusDropdownBtn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fas fa-filter text-primary mr-1"></i> Status: <span id="statusFilterSummary" class="font-weight-bold text-dark">All</span>
+                    <button class="btn btn-sm dropdown-toggle shadow-sm" type="button" id="statusDropdownBtn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-filter text-primary mr-2"></i>
+                        <span class="text-secondary mr-1">Status:</span>
+                        <span id="statusFilterSummary" class="font-weight-bold text-dark mr-2">All</span>
+                        <span class="badge badge-secondary badge-pill" id="cntTotalBadge">0</span>
                     </button>
-                    <div class="dropdown-menu p-3 shadow" aria-labelledby="statusDropdownBtn" style="min-width: 320px;" onclick="event.stopPropagation()">
+                    <div class="dropdown-menu shadow" aria-labelledby="statusDropdownBtn" onclick="event.stopPropagation()">
                         <div class="d-flex justify-content-between align-items-center pb-2 mb-2 border-bottom">
-                            <span class="small font-weight-bold text-muted text-uppercase"><i class="fas fa-tasks mr-1"></i> Filter By Status</span>
-                            <div>
-                                <button type="button" class="btn btn-sm btn-link p-0 mr-3 font-weight-bold text-primary" id="btnStatusSelectAll">All</button>
-                                <button type="button" class="btn btn-sm btn-link p-0 text-secondary" id="btnStatusClearAll">Clear</button>
+                            <span class="small font-weight-bold text-muted text-uppercase" style="letter-spacing: 0.5px;">
+                                <i class="fas fa-sliders-h mr-1"></i> Filter by Status
+                            </span>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2 font-weight-bold" id="btnStatusSelectAll">All</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 ml-1" id="btnStatusClearAll">Clear</button>
                             </div>
                         </div>
-                        <div class="custom-control custom-checkbox my-2">
-                            <input type="checkbox" class="custom-control-input status-checkbox" id="chkStatus_ready" value="ready" checked>
-                            <label class="custom-control-label d-flex justify-content-between align-items-center w-100" for="chkStatus_ready" style="cursor: pointer;">
-                                <span><i class="fas fa-check-circle text-success mr-1"></i> Ready to Import</span>
-                                <span class="badge badge-success ml-auto" id="cntReady">0</span>
-                            </label>
-                        </div>
-                        <div class="custom-control custom-checkbox my-2">
-                            <input type="checkbox" class="custom-control-input status-checkbox" id="chkStatus_imported" value="imported" checked>
-                            <label class="custom-control-label d-flex justify-content-between align-items-center w-100" for="chkStatus_imported" style="cursor: pointer;">
-                                <span><i class="fas fa-history text-info mr-1"></i> Imported (Already in REDCap)</span>
-                                <span class="badge badge-info ml-auto" id="cntImported">0</span>
-                            </label>
-                        </div>
-                        <div class="custom-control custom-checkbox my-2">
-                            <input type="checkbox" class="custom-control-input status-checkbox" id="chkStatus_case_4" value="case_4" checked>
-                            <label class="custom-control-label d-flex justify-content-between align-items-center w-100" for="chkStatus_case_4" style="cursor: pointer;">
-                                <span><i class="fas fa-user-tag text-primary mr-1"></i> Possible Duplicates (Case 4)</span>
-                                <span class="badge badge-primary ml-auto" id="cntCase4">0</span>
-                            </label>
-                        </div>
-                        <div class="custom-control custom-checkbox my-2">
-                            <input type="checkbox" class="custom-control-input status-checkbox" id="chkStatus_case_2" value="case_2" checked>
-                            <label class="custom-control-label d-flex justify-content-between align-items-center w-100" for="chkStatus_case_2" style="cursor: pointer;">
-                                <span><i class="fas fa-clone text-danger mr-1"></i> Duplicate Submissions (Case 2)</span>
-                                <span class="badge badge-danger ml-auto" id="cntCase2">0</span>
-                            </label>
-                        </div>
-                        <div class="custom-control custom-checkbox my-2">
-                            <input type="checkbox" class="custom-control-input status-checkbox" id="chkStatus_case_3" value="case_3" checked>
-                            <label class="custom-control-label d-flex justify-content-between align-items-center w-100" for="chkStatus_case_3" style="cursor: pointer;">
-                                <span><i class="fas fa-users text-warning mr-1"></i> Shared Phone Conflicts (Case 3)</span>
-                                <span class="badge badge-warning ml-auto" id="cntCase3">0</span>
-                            </label>
-                        </div>
-                        <div class="custom-control custom-checkbox my-2">
-                            <input type="checkbox" class="custom-control-input status-checkbox" id="chkStatus_excluded" value="excluded" checked>
-                            <label class="custom-control-label d-flex justify-content-between align-items-center w-100" for="chkStatus_excluded" style="cursor: pointer;">
-                                <span><i class="fas fa-ban text-secondary mr-1"></i> Excluded / Ineligible</span>
-                                <span class="badge badge-secondary ml-auto" id="cntExcluded">0</span>
-                            </label>
-                        </div>
+                        <label class="status-option-item" for="chkStatus_ready">
+                            <div class="d-flex align-items-center">
+                                <input type="checkbox" class="status-checkbox" id="chkStatus_ready" value="ready" checked>
+                                <i class="fas fa-check-circle text-success fa-fw mr-2"></i>
+                                <span class="status-name">Ready to Import</span>
+                            </div>
+                            <span class="badge badge-success ml-2" id="cntReady">0</span>
+                        </label>
+                        <label class="status-option-item" for="chkStatus_imported">
+                            <div class="d-flex align-items-center">
+                                <input type="checkbox" class="status-checkbox" id="chkStatus_imported" value="imported" checked>
+                                <i class="fas fa-history text-info fa-fw mr-2"></i>
+                                <span class="status-name">Imported (Already in REDCap)</span>
+                            </div>
+                            <span class="badge badge-info ml-2" id="cntImported">0</span>
+                        </label>
+                        <label class="status-option-item" for="chkStatus_case_4">
+                            <div class="d-flex align-items-center">
+                                <input type="checkbox" class="status-checkbox" id="chkStatus_case_4" value="case_4" checked>
+                                <i class="fas fa-user-tag text-primary fa-fw mr-2"></i>
+                                <span class="status-name">Possible Duplicates (Case 4)</span>
+                            </div>
+                            <span class="badge badge-primary ml-2" id="cntCase4">0</span>
+                        </label>
+                        <label class="status-option-item" for="chkStatus_case_2">
+                            <div class="d-flex align-items-center">
+                                <input type="checkbox" class="status-checkbox" id="chkStatus_case_2" value="case_2" checked>
+                                <i class="fas fa-clone text-danger fa-fw mr-2"></i>
+                                <span class="status-name">Duplicate Submissions (Case 2)</span>
+                            </div>
+                            <span class="badge badge-danger ml-2" id="cntCase2">0</span>
+                        </label>
+                        <label class="status-option-item" for="chkStatus_case_3">
+                            <div class="d-flex align-items-center">
+                                <input type="checkbox" class="status-checkbox" id="chkStatus_case_3" value="case_3" checked>
+                                <i class="fas fa-users text-warning fa-fw mr-2"></i>
+                                <span class="status-name">Shared Phone Conflicts (Case 3)</span>
+                            </div>
+                            <span class="badge badge-warning ml-2" id="cntCase3">0</span>
+                        </label>
+                        <label class="status-option-item" for="chkStatus_excluded">
+                            <div class="d-flex align-items-center">
+                                <input type="checkbox" class="status-checkbox" id="chkStatus_excluded" value="excluded" checked>
+                                <i class="fas fa-ban text-secondary fa-fw mr-2"></i>
+                                <span class="status-name">Excluded / Ineligible</span>
+                            </div>
+                            <span class="badge badge-secondary ml-2" id="cntExcluded">0</span>
+                        </label>
                     </div>
                 </div>
-                <span class="badge badge-light border text-muted small p-1 px-2" id="cntTotalBadge">0 total</span>
             </div>
             <div class="import-search-box" style="min-width: 260px; max-width: 360px;">
                 <div class="input-group input-group-sm">
