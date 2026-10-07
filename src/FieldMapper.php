@@ -61,57 +61,51 @@ class FieldMapper
         $mappingMode = $config['mapping_mode'] ?? 'auto_map_blacklist';
         $skipFields = array_filter(array_map('trim', explode(',', $config['skip_fields'] ?? '')));
 
-        // Parse custom value mappings
-        $customMappings = [];
-        if (!empty($config['custom_value_mappings']) && is_array($config['custom_value_mappings'])) {
-            foreach ($config['custom_value_mappings'] as $cm) {
-                $qField = trim($cm['qualtrics_field'] ?? '');
-                $rField = trim($cm['redcap_field'] ?? '');
-                if ($qField !== '' && $rField !== '') {
-                    $customMappings[$qField] = [
-                        'redcap_field' => $rField,
-                        'value_map' => !empty($cm['value_map_json']) ? json_decode($cm['value_map_json'], true) : [],
-                    ];
+        // Build lowercase lookup table for raw row keys
+        $rawLower = [];
+        foreach ($rawRow as $k => $v) {
+            $rawLower[strtolower(trim((string)$k))] = (string)$k;
+        }
+
+        $customMappings = self::parseCustomMappings($config);
+        $mapped = [];
+        $matchedRawKeys = [];
+
+        // 2. Perform custom mappings first with case/suffix-tolerance
+        foreach ($customMappings as $cm) {
+            $qField = $cm['qualtrics_field'];
+            $rField = $cm['redcap_field'];
+            $valKey = null;
+            $val = self::findQualtricsValue($rawRow, $qField, $rawLower, $valKey);
+            if ($val !== null) {
+                if ($valKey !== null) {
+                    $matchedRawKeys[$valKey] = true;
                 }
+                if (isset($cm['value_map'][(string)$val])) {
+                    $val = $cm['value_map'][(string)$val];
+                }
+                $mapped[$rField] = $val;
             }
         }
 
-        $mapped = [];
-
-        // 2. Perform mapping based on mode
-        if ($mappingMode === 'whitelist') {
-            foreach ($customMappings as $qField => $mapping) {
-                if (isset($rawRow[$qField])) {
-                    $val = $rawRow[$qField];
-                    if (isset($mapping['value_map'][(string)$val])) {
-                        $val = $mapping['value_map'][(string)$val];
-                    }
-                    $mapped[$mapping['redcap_field']] = $val;
-                }
-            }
-        } else {
-            // auto_map_blacklist mode
+        // In auto_map_blacklist mode, auto-map any remaining raw keys that directly match REDCap fields
+        if ($mappingMode !== 'whitelist') {
             foreach ($rawRow as $key => $val) {
+                if (isset($matchedRawKeys[$key])) {
+                    continue;
+                }
                 if (in_array($key, self::STANDARD_QUALTRICS_METADATA, true) || in_array($key, $skipFields, true)) {
                     continue;
                 }
 
                 $targetField = $key;
-                $valueMap = null;
-                if (isset($customMappings[$key])) {
-                    $targetField = $customMappings[$key]['redcap_field'];
-                    $valueMap = $customMappings[$key]['value_map'];
-                }
-
                 if (!empty($redcapFieldNames) && !in_array($targetField, $redcapFieldNames, true)) {
                     continue;
                 }
 
-                if (isset($valueMap[(string)$val])) {
-                    $val = $valueMap[(string)$val];
+                if (!isset($mapped[$targetField])) {
+                    $mapped[$targetField] = $val;
                 }
-
-                $mapped[$targetField] = $val;
             }
         }
 
@@ -158,18 +152,17 @@ class FieldMapper
 
         // Apply configurable static fields and import flags
         $today = date('Y-m-d');
-        if (!empty($config['static_field_defaults']) && is_array($config['static_field_defaults'])) {
-            foreach ($config['static_field_defaults'] as $sf) {
-                $sField = trim($sf['field_name'] ?? '');
-                $sVal = trim((string)($sf['field_value'] ?? ''));
-                if ($sField !== '') {
-                    if (strtolower($sVal) === 'today') {
-                        $mapped[$sField] = $today;
-                    } elseif (strtolower($sVal) === 'now') {
-                        $mapped[$sField] = date('Y-m-d H:i:s');
-                    } else {
-                        $mapped[$sField] = $sVal;
-                    }
+        $staticDefaults = self::parseStaticDefaults($config);
+        foreach ($staticDefaults as $sf) {
+            $sField = $sf['field_name'];
+            $sVal = $sf['field_value'];
+            if ($sField !== '') {
+                if (strtolower($sVal) === 'today') {
+                    $mapped[$sField] = $today;
+                } elseif (strtolower($sVal) === 'now') {
+                    $mapped[$sField] = date('Y-m-d H:i:s');
+                } else {
+                    $mapped[$sField] = $sVal;
                 }
             }
         }
@@ -296,4 +289,203 @@ class FieldMapper
 
         return true;
     }
+
+    /**
+     * Parse custom value mappings supporting both getSubSettings() structured array
+     * and raw getProjectSettings() parallel arrays.
+     */
+    public static function parseCustomMappings(array $config): array
+    {
+        $mappings = [];
+
+        if (!empty($config['custom_value_mappings']) && is_array($config['custom_value_mappings'])) {
+            $isAssocList = false;
+            foreach ($config['custom_value_mappings'] as $idx => $row) {
+                if (is_array($row) && (isset($row['qualtrics_field']) || isset($row['redcap_field']))) {
+                    $isAssocList = true;
+                    $qField = trim((string)($row['qualtrics_field'] ?? ''));
+                    $rField = trim((string)($row['redcap_field'] ?? ''));
+                    $vJson = $row['value_map_json'] ?? '';
+                    if ($qField !== '' && $rField !== '') {
+                        $mappings[] = [
+                            'qualtrics_field' => $qField,
+                            'redcap_field' => $rField,
+                            'value_map' => self::parseValueMap($vJson),
+                        ];
+                    }
+                }
+            }
+            if ($isAssocList) {
+                return $mappings;
+            }
+        }
+
+        // Handle raw parallel arrays from getProjectSettings()
+        if (!empty($config['qualtrics_field']) && is_array($config['qualtrics_field']) &&
+            !empty($config['redcap_field']) && is_array($config['redcap_field'])) {
+            foreach ($config['qualtrics_field'] as $idx => $q) {
+                $qField = trim((string)$q);
+                $rField = trim((string)($config['redcap_field'][$idx] ?? ''));
+                $vJson = $config['value_map_json'][$idx] ?? '';
+                if ($qField !== '' && $rField !== '') {
+                    $mappings[] = [
+                        'qualtrics_field' => $qField,
+                        'redcap_field' => $rField,
+                        'value_map' => self::parseValueMap($vJson),
+                    ];
+                }
+            }
+        }
+
+        return $mappings;
+    }
+
+    /**
+     * Parse static field defaults supporting both getSubSettings() structured array
+     * and raw getProjectSettings() parallel arrays.
+     */
+    public static function parseStaticDefaults(array $config): array
+    {
+        $defaults = [];
+
+        if (!empty($config['static_field_defaults']) && is_array($config['static_field_defaults'])) {
+            $isAssocList = false;
+            foreach ($config['static_field_defaults'] as $idx => $row) {
+                if (is_array($row) && (isset($row['field_name']) || isset($row['field_value']))) {
+                    $isAssocList = true;
+                    $fName = trim((string)($row['field_name'] ?? ''));
+                    $fVal = trim((string)($row['field_value'] ?? ''));
+                    if ($fName !== '') {
+                        $defaults[] = [
+                            'field_name' => $fName,
+                            'field_value' => $fVal,
+                        ];
+                    }
+                }
+            }
+            if ($isAssocList) {
+                return $defaults;
+            }
+        }
+
+        // Handle raw parallel arrays from getProjectSettings()
+        if (!empty($config['field_name']) && is_array($config['field_name'])) {
+            foreach ($config['field_name'] as $idx => $fn) {
+                $fName = trim((string)$fn);
+                $fVal = trim((string)($config['field_value'][$idx] ?? ''));
+                if ($fName !== '') {
+                    $defaults[] = [
+                        'field_name' => $fName,
+                        'field_value' => $fVal,
+                    ];
+                }
+            }
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * Decode or normalize JSON value map.
+     */
+    public static function parseValueMap($val): array
+    {
+        if (empty($val)) {
+            return [];
+        }
+        if (is_array($val)) {
+            return $val;
+        }
+        $decoded = json_decode((string)$val, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Case- and suffix-tolerant lookup of a Qualtrics field value in raw response row.
+     * Matches in order:
+     * 1. Exact match ($rawRow[$qField])
+     * 2. Case-insensitive exact match
+     * 3. Suffix variations (with or without '_TEXT')
+     */
+    public static function findQualtricsValue(array $rawRow, string $qField, ?array &$rawLower = null, ?string &$matchedKey = null): mixed
+    {
+        $matchedKey = null;
+        $qFieldTrimmed = trim($qField);
+        if ($qFieldTrimmed === '') {
+            return null;
+        }
+
+        // 1. Exact match
+        if (array_key_exists($qFieldTrimmed, $rawRow)) {
+            $matchedKey = $qFieldTrimmed;
+            return $rawRow[$qFieldTrimmed];
+        }
+
+        // Build lowercase index once
+        if ($rawLower === null) {
+            $rawLower = [];
+            foreach ($rawRow as $k => $v) {
+                $rawLower[strtolower(trim((string)$k))] = (string)$k;
+            }
+        }
+
+        $lowerTarget = strtolower($qFieldTrimmed);
+
+        // 2. Case-insensitive exact match
+        if (isset($rawLower[$lowerTarget])) {
+            $matchedKey = $rawLower[$lowerTarget];
+            return $rawRow[$matchedKey];
+        }
+
+        // 3. Suffix tolerance (with or without '_text')
+        if (str_ends_with($lowerTarget, '_text')) {
+            $base = substr($lowerTarget, 0, -5);
+            if (isset($rawLower[$base])) {
+                $matchedKey = $rawLower[$base];
+                return $rawRow[$matchedKey];
+            }
+        } else {
+            $withText = $lowerTarget . '_text';
+            if (isset($rawLower[$withText])) {
+                $matchedKey = $rawLower[$withText];
+                return $rawRow[$matchedKey];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract candidate display name and phone for preview display even if validation failed.
+     */
+    public static function extractCandidatePreviewInfo(array $rawRow, array $config): array
+    {
+        $rawLower = [];
+        foreach ($rawRow as $k => $v) {
+            $rawLower[strtolower(trim((string)$k))] = (string)$k;
+        }
+
+        $customMappings = self::parseCustomMappings($config);
+        $mappedVals = [];
+        foreach ($customMappings as $cm) {
+            $val = self::findQualtricsValue($rawRow, $cm['qualtrics_field'], $rawLower);
+            if ($val !== null) {
+                $mappedVals[$cm['redcap_field']] = $val;
+            }
+        }
+
+        $phoneField = $config['dedup_phone_field'] ?? 'phone1';
+        $firstField = $config['dedup_first_name_field'] ?? 'first_name';
+        $lastField = $config['dedup_last_name_field'] ?? 'last_name';
+
+        $first = $mappedVals[$firstField] ?? $rawRow[$firstField] ?? $rawRow['first_name'] ?? '';
+        $last = $mappedVals[$lastField] ?? $rawRow[$lastField] ?? $rawRow['last_name'] ?? '';
+        $phone = $mappedVals[$phoneField] ?? $rawRow[$phoneField] ?? $rawRow['phone1'] ?? '';
+
+        return [
+            'name' => trim(Deduplicator::sanitizeName((string)$first) . ' ' . Deduplicator::sanitizeName((string)$last)),
+            'phone' => AutoSanitizer::formatPhone((string)$phone),
+        ];
+    }
 }
+

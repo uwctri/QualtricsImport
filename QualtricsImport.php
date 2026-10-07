@@ -138,6 +138,20 @@ class QualtricsImport extends AbstractExternalModule
     ): array {
         $today = date('Y-m-d');
         $config = $this->getProjectSettings($projectId);
+        try {
+            if (method_exists($this, 'getSubSettings')) {
+                $subMappings = $this->getSubSettings('custom_value_mappings', $projectId);
+                if (!empty($subMappings) && is_array($subMappings)) {
+                    $config['custom_value_mappings'] = $subMappings;
+                }
+                $subDefaults = $this->getSubSettings('static_field_defaults', $projectId);
+                if (!empty($subDefaults) && is_array($subDefaults)) {
+                    $config['static_field_defaults'] = $subDefaults;
+                }
+            }
+        } catch (\Throwable) {
+            // Fall back to getProjectSettings
+        }
         $surveyId = trim((string)($config['qualtrics_survey_id'] ?? ''));
 
         $emptyResponse = [
@@ -215,13 +229,14 @@ class QualtricsImport extends AbstractExternalModule
             $exclusionReason = null;
             $mapped = FieldMapper::mapRecord($rawRow, $config, $fieldNames, $dict, $projectId, $exclusionReason);
             if ($mapped === null) {
+                $previewInfo = FieldMapper::extractCandidatePreviewInfo($rawRow, $config);
                 $evaluations[] = [
                     'category' => 'Ineligible / Missing Fields',
                     'status' => 'skipped_ineligible',
                     'description' => $exclusionReason ?: 'Response excluded by filter logic or missing required fields',
                     'qualtrics_id' => (string)($rawRow['ResponseId'] ?? ''),
-                    'candidate_name' => trim(($rawRow['first_name'] ?? '') . ' ' . ($rawRow['last_name'] ?? '')),
-                    'candidate_phone' => (string)($rawRow['phone1'] ?? ''),
+                    'candidate_name' => $previewInfo['name'],
+                    'candidate_phone' => $previewInfo['phone'],
                     'record_id' => null,
                     'scores' => null,
                 ];
@@ -231,8 +246,8 @@ class QualtricsImport extends AbstractExternalModule
                     $this->log("Qualtrics Import: Response excluded", [
                         'project_id' => $projectId,
                         'qualtrics_id' => (string)($rawRow['ResponseId'] ?? ''),
-                        'candidate_name' => trim(($rawRow['first_name'] ?? '') . ' ' . ($rawRow['last_name'] ?? '')),
-                        'candidate_phone' => (string)($rawRow['phone1'] ?? ''),
+                        'candidate_name' => $previewInfo['name'],
+                        'candidate_phone' => $previewInfo['phone'],
                         'status' => 'skipped_ineligible',
                         'reason' => $exclusionReason ?: 'Excluded by filter logic, completion status, or missing required fields',
                     ]);
