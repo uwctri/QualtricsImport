@@ -66,6 +66,23 @@
     border: 1px solid #d6d8db;
 }
 
+.badge-imported {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.status-filter-dropdown .dropdown-menu {
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+
+.status-filter-dropdown .custom-control-label {
+    user-select: none;
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
 .filter-pills {
     display: flex;
     flex-wrap: wrap;

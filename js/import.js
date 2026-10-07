@@ -3,7 +3,25 @@
     if (!module) return;
 
     let currentData = null;
-    let activeFilter = 'all';
+    const STATUS_MAP = {
+        'ready': ['accepted_clean'],
+        'imported': ['skipped_case_1'],
+        'case_4': ['accepted_case_4'],
+        'case_2': ['skipped_case_2'],
+        'case_3': ['rejected_case_3'],
+        'excluded': ['skipped_ineligible', 'rejected_invalid_phone']
+    };
+    const STATUS_LABELS = {
+        'ready': 'Ready',
+        'imported': 'Imported',
+        'case_4': 'Possible Dups',
+        'case_2': 'Duplicates',
+        'case_3': 'Shared Phone',
+        'excluded': 'Excluded'
+    };
+    const ALL_STATUS_KEYS = Object.keys(STATUS_MAP);
+    let selectedStatuses = new Set(ALL_STATUS_KEYS);
+
     let searchTerm = '';
     let sortColumn = null;
     let sortDirection = 'asc';
@@ -22,10 +40,27 @@
         if (status === 'skipped_case_2') badgeClass = 'badge-case-2';
         else if (status === 'rejected_case_3') badgeClass = 'badge-case-3';
         else if (status === 'accepted_case_4') badgeClass = 'badge-case-4';
-        else if (status === 'skipped_case_1' || status === 'rejected_invalid_phone' || status === 'skipped_ineligible') {
+        else if (status === 'skipped_case_1') badgeClass = 'badge-imported';
+        else if (status === 'rejected_invalid_phone' || status === 'skipped_ineligible') {
             badgeClass = 'badge-invalid';
         }
         return `<span class="badge-status ${badgeClass}">${category}</span>`;
+    };
+
+    const updateStatusFilterSummary = () => {
+        const count = selectedStatuses.size;
+        let label = 'All';
+        if (count === 0) {
+            label = 'None';
+        } else if (count === ALL_STATUS_KEYS.length) {
+            label = 'All';
+        } else if (count === 1) {
+            const singleKey = Array.from(selectedStatuses)[0];
+            label = STATUS_LABELS[singleKey] || singleKey;
+        } else {
+            label = `${count} selected`;
+        }
+        $('#statusFilterSummary').text(label);
     };
 
     const renderTable = (evaluations) => {
@@ -38,19 +73,19 @@
             return;
         }
 
-        // 1. Filter by category pill
+        // 1. Filter by selected statuses
         let filtered = evaluations.filter(item => {
-            if (activeFilter === 'all') return true;
-            if (activeFilter === 'ready' && (item.status === 'accepted_clean' || item.status === 'accepted_case_4')) return true;
-            if (activeFilter === 'clean' && item.status === 'accepted_clean') return true;
-            if (activeFilter === 'case_4' && item.status === 'accepted_case_4') return true;
-            if (activeFilter === 'case_2' && item.status === 'skipped_case_2') return true;
-            if (activeFilter === 'case_3' && item.status === 'rejected_case_3') return true;
-            if (activeFilter === 'excluded' && (item.status === 'skipped_case_1' || item.status === 'rejected_invalid_phone' || item.status === 'skipped_ineligible')) return true;
+            if (selectedStatuses.size === ALL_STATUS_KEYS.length) return true;
+            if (selectedStatuses.size === 0) return false;
+            for (const key of selectedStatuses) {
+                if (STATUS_MAP[key] && STATUS_MAP[key].includes(item.status)) {
+                    return true;
+                }
+            }
             return false;
         });
 
-        const pillTotal = filtered.length;
+        const statusFilteredTotal = filtered.length;
 
         // 2. Filter by search term across all columns
         if (searchTerm) {
@@ -109,9 +144,9 @@
 
         // Update footer info
         if (searchTerm) {
-            $('#tableRecordInfo').html(`<span>Showing <strong>${filtered.length}</strong> of ${pillTotal} responses (${evaluations.length} total)</span>`);
-        } else if (pillTotal < evaluations.length) {
-            $('#tableRecordInfo').html(`<span>Showing <strong>${filtered.length}</strong> of ${evaluations.length} total responses</span>`);
+            $('#tableRecordInfo').html(`<span>Showing <strong>${filtered.length}</strong> of ${evaluations.length} responses matching search</span>`);
+        } else if (statusFilteredTotal < evaluations.length) {
+            $('#tableRecordInfo').html(`<span>Showing <strong>${filtered.length}</strong> of ${evaluations.length} total responses (filtered by status)</span>`);
         } else {
             $('#tableRecordInfo').html(`<span>Showing all <strong>${filtered.length}</strong> responses</span>`);
         }
@@ -119,7 +154,7 @@
         if (filtered.length === 0) {
             const msg = searchTerm
                 ? `No records matching "<strong>${$('<div>').text(searchTerm).html()}</strong>"`
-                : 'No records found for selected filter.';
+                : 'No records found for selected status filter.';
             $tbody.html(`<tr><td colspan="7" class="text-center text-muted p-4">${msg}</td></tr>`);
             return;
         }
@@ -149,12 +184,13 @@
     };
 
     const updateCounts = (counts, total) => {
-        $('#cntTotal').text(total || 0);
-        $('#cntReady').text((counts.clean_new || 0) + (counts.case_4_suspected || 0));
-        $('#cntCase2').text(counts.case_2_duplicate || 0);
-        $('#cntCase3').text(counts.case_3_household || 0);
-        $('#cntCase4').text(counts.case_4_suspected || 0);
-        $('#cntExcluded').text((counts.case_1_existing_id || 0) + (counts.invalid_phone || 0) + (counts.missing_required || 0));
+        $('#cntTotalBadge').text(`${(total || 0).toLocaleString()} total`);
+        $('#cntReady').text((counts.clean_new || 0).toLocaleString());
+        $('#cntImported').text((counts.case_1_existing_id || 0).toLocaleString());
+        $('#cntCase4').text((counts.case_4_suspected || 0).toLocaleString());
+        $('#cntCase2').text((counts.case_2_duplicate || 0).toLocaleString());
+        $('#cntCase3').text((counts.case_3_household || 0).toLocaleString());
+        $('#cntExcluded').text(((counts.missing_required || 0) + (counts.invalid_phone || 0)).toLocaleString());
     };
 
     const getPreviewParams = () => {
@@ -299,10 +335,35 @@
             loadPreview();
         });
 
-        $('.filter-pill').on('click', function() {
-            $('.filter-pill').removeClass('active');
-            $(this).addClass('active');
-            activeFilter = $(this).data('filter');
+        // Status filter checkbox toggle
+        $(document).on('change', '.status-checkbox', function() {
+            const val = $(this).val();
+            if ($(this).is(':checked')) {
+                selectedStatuses.add(val);
+            } else {
+                selectedStatuses.delete(val);
+            }
+            updateStatusFilterSummary();
+            if (currentData) {
+                renderTable(currentData.evaluations || []);
+            }
+        });
+
+        // Status filter: Select All ("All")
+        $('#btnStatusSelectAll').on('click', () => {
+            $('.status-checkbox').prop('checked', true);
+            selectedStatuses = new Set(ALL_STATUS_KEYS);
+            updateStatusFilterSummary();
+            if (currentData) {
+                renderTable(currentData.evaluations || []);
+            }
+        });
+
+        // Status filter: Clear All ("Clear")
+        $('#btnStatusClearAll').on('click', () => {
+            $('.status-checkbox').prop('checked', false);
+            selectedStatuses.clear();
+            updateStatusFilterSummary();
             if (currentData) {
                 renderTable(currentData.evaluations || []);
             }
