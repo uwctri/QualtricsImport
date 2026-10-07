@@ -133,7 +133,19 @@ class FieldMapper
         $mapped['phone1'] = AutoSanitizer::sanitizePhone($mapped[$phoneField] ?? $rawRow['phone1'] ?? '', true);
         $mapped['first_name'] = Deduplicator::sanitizeName($mapped[$firstField] ?? $rawRow['first_name'] ?? '');
         $mapped['last_name'] = Deduplicator::sanitizeName($mapped[$lastField] ?? $rawRow['last_name'] ?? '');
-        $mapped['middle_initial'] = Deduplicator::sanitizeName($mapped['middle_initial'] ?? $rawRow['middle_initial'] ?? '');
+
+        // Sanitize middle initial/name and strip pandas/missing placeholders like 'Nan', 'None', 'N/A'
+        $rawMiddle = trim((string)($mapped['middle_initial'] ?? $rawRow['middle_initial'] ?? ''));
+        if (in_array(strtolower($rawMiddle), ['nan', 'null', 'none', 'n/a', 'na'], true)) {
+            $mapped['middle_initial'] = '';
+        } else {
+            $mapped['middle_initial'] = Deduplicator::sanitizeName($rawMiddle);
+        }
+
+        if (isset($mapped['middle_name']) && in_array(strtolower(trim((string)$mapped['middle_name'])), ['nan', 'null', 'none', 'n/a', 'na'], true)) {
+            $mapped['middle_name'] = '';
+        }
+
         $mapped['display_name'] = trim("{$mapped['first_name']} {$mapped['last_name']}");
 
         // 5. Evaluate REDCap filter logic if configured
