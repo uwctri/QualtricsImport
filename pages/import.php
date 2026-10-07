@@ -56,6 +56,9 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
             <div id="previewScopeNotice" class="my-1"></div>
         </div>
         <div class="d-flex align-items-center my-1">
+            <button id="btnDiagnostics" class="btn btn-outline-info mr-2" style="display: none;" title="Inspect Qualtrics Survey fields and active module mappings">
+                <i class="fas fa-stethoscope"></i> Diagnostics
+            </button>
             <button id="btnRefresh" class="btn btn-outline-secondary mr-2" <?= !$hasSurveyId ? 'disabled' : '' ?>>
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>
@@ -131,6 +134,51 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
             </div>
             <div class="p-2 px-3 text-muted small bg-light border-top d-flex justify-content-between align-items-center" id="tableRecordInfo">
                 <span>0 responses</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Diagnostics Modal -->
+<div class="modal fade" id="diagnosticsModal" tabindex="-1" role="dialog" aria-labelledby="diagnosticsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="diagnosticsModalLabel"><i class="fas fa-stethoscope text-info"></i> Survey & Mapping Diagnostics</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <h6><i class="fas fa-map-signs text-primary"></i> Active Custom Mappings</h6>
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-bordered">
+                        <thead class="thead-light">
+                            <tr><th>Qualtrics Field</th><th>REDCap Target Field</th><th>Value Map</th></tr>
+                        </thead>
+                        <tbody id="diagMappingsBody"></tbody>
+                    </table>
+                </div>
+
+                <h6><i class="fas fa-thumbtack text-secondary"></i> Active Static Defaults</h6>
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-bordered">
+                        <thead class="thead-light">
+                            <tr><th>Target Field</th><th>Static Value</th></tr>
+                        </thead>
+                        <tbody id="diagStaticBody"></tbody>
+                    </table>
+                </div>
+
+                <h6><i class="fas fa-tags text-success"></i> Fields Received in Qualtrics Export</h6>
+                <div id="diagFieldsContainer" class="p-2 border rounded bg-light mb-3" style="max-height: 120px; overflow-y: auto;">
+                </div>
+
+                <h6><i class="fas fa-file-code text-muted"></i> Sample Survey Response (First Record)</h6>
+                <pre id="diagSampleJson" class="bg-dark text-light p-2 rounded" style="max-height: 180px; overflow-y: auto; font-size: 11px;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

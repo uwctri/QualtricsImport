@@ -226,6 +226,49 @@ class QualtricsImport extends AbstractExternalModule
 
         // 4. Process each survey response
         foreach ($rawSurveyRows as $rawRow) {
+            $respId = (string)($rawRow['ResponseId'] ?? '');
+
+            // Pre-check Case 1: Already imported by Qualtrics ResponseId
+            $alreadyImported = null;
+            if ($respId !== '') {
+                foreach ($poolRecords as $existing) {
+                    if ($existing['qualtrics_id'] !== '' && $existing['qualtrics_id'] === $respId) {
+                        $alreadyImported = $existing;
+                        break;
+                    }
+                }
+            }
+
+            if ($alreadyImported !== null) {
+                $categoryCounts['case_1_existing_id']++;
+                $evalSummary = [
+                    'category' => 'Already Imported',
+                    'status' => 'skipped_case_1',
+                    'description' => "Qualtrics ResponseId '{$respId}' already exists in REDCap record {$alreadyImported['record_id']}",
+                    'qualtrics_id' => $respId,
+                    'candidate_name' => trim("{$alreadyImported['first_name']} {$alreadyImported['last_name']}"),
+                    'candidate_phone' => $alreadyImported['phone1'],
+                    'record_id' => null,
+                    'matched_record_id' => $alreadyImported['record_id'],
+                    'scores' => null,
+                ];
+                $evaluations[] = $evalSummary;
+
+                if (!$isDryRun) {
+                    $this->log("Qualtrics Import: Duplicate response excluded", [
+                        'project_id' => $projectId,
+                        'qualtrics_id' => $respId,
+                        'candidate_name' => $evalSummary['candidate_name'],
+                        'candidate_phone' => $evalSummary['candidate_phone'],
+                        'category' => 'Already Imported',
+                        'status' => 'skipped_case_1',
+                        'matched_record_id' => $alreadyImported['record_id'],
+                        'description' => $evalSummary['description'],
+                    ]);
+                }
+                continue;
+            }
+
             $exclusionReason = null;
             $mapped = FieldMapper::mapRecord($rawRow, $config, $fieldNames, $dict, $projectId, $exclusionReason);
             if ($mapped === null) {
@@ -234,7 +277,7 @@ class QualtricsImport extends AbstractExternalModule
                     'category' => 'Ineligible / Missing Fields',
                     'status' => 'skipped_ineligible',
                     'description' => $exclusionReason ?: 'Response excluded by filter logic or missing required fields',
-                    'qualtrics_id' => (string)($rawRow['ResponseId'] ?? ''),
+                    'qualtrics_id' => $respId,
                     'candidate_name' => $previewInfo['name'],
                     'candidate_phone' => $previewInfo['phone'],
                     'record_id' => null,
@@ -245,7 +288,7 @@ class QualtricsImport extends AbstractExternalModule
                 if (!$isDryRun) {
                     $this->log("Qualtrics Import: Response excluded", [
                         'project_id' => $projectId,
-                        'qualtrics_id' => (string)($rawRow['ResponseId'] ?? ''),
+                        'qualtrics_id' => $respId,
                         'candidate_name' => $previewInfo['name'],
                         'candidate_phone' => $previewInfo['phone'],
                         'status' => 'skipped_ineligible',
@@ -381,6 +424,12 @@ class QualtricsImport extends AbstractExternalModule
             'counts' => $categoryCounts,
             'evaluations' => $evaluations,
             'timestamp' => date('Y-m-d H:i:s'),
+            'diagnostics' => [
+                'parsed_custom_mappings' => FieldMapper::parseCustomMappings($config),
+                'parsed_static_defaults' => FieldMapper::parseStaticDefaults($config),
+                'qualtrics_fields' => !empty($rawSurveyRows) ? array_keys($rawSurveyRows[0]) : [],
+                'sample_raw_values' => !empty($rawSurveyRows) ? array_slice($rawSurveyRows[0], 0, 25) : [],
+            ],
         ];
 
         // 5. Commit to REDCap if not dry run

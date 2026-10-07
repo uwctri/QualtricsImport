@@ -133,8 +133,16 @@ class FieldMapper
         $lastField = $config['dedup_last_name_field'] ?? 'last_name';
 
         $mapped['phone1'] = AutoSanitizer::sanitizePhone($mapped[$phoneField] ?? $rawRow['phone1'] ?? '', true);
-        $mapped['first_name'] = Deduplicator::sanitizeName($mapped[$firstField] ?? $rawRow['first_name'] ?? '');
-        $mapped['last_name'] = Deduplicator::sanitizeName($mapped[$lastField] ?? $rawRow['last_name'] ?? '');
+        $rawFirstName = $mapped[$firstField] ?? $rawRow['first_name'] ?? '';
+        if (is_numeric(trim((string)$rawFirstName))) {
+            $rawFirstName = '';
+        }
+        $rawLastName = $mapped[$lastField] ?? $rawRow['last_name'] ?? '';
+        if (is_numeric(trim((string)$rawLastName))) {
+            $rawLastName = '';
+        }
+        $mapped['first_name'] = Deduplicator::sanitizeName($rawFirstName);
+        $mapped['last_name'] = Deduplicator::sanitizeName($rawLastName);
 
         // Sanitize middle initial/name and strip pandas/missing placeholders like 'Nan', 'None', 'N/A'
         $rawMiddle = trim((string)($mapped['middle_initial'] ?? $rawRow['middle_initial'] ?? ''));
@@ -157,6 +165,10 @@ class FieldMapper
             $sField = $sf['field_name'];
             $sVal = $sf['field_value'];
             if ($sField !== '') {
+                // Protect core demographic fields from being overwritten by numeric flags (e.g. import flag = 1)
+                if (in_array($sField, ['first_name', 'last_name'], true) && is_numeric($sVal)) {
+                    continue;
+                }
                 if (strtolower($sVal) === 'today') {
                     $mapped[$sField] = $today;
                 } elseif (strtolower($sVal) === 'now') {
@@ -402,10 +414,8 @@ class FieldMapper
 
     /**
      * Case- and suffix-tolerant lookup of a Qualtrics field value in raw response row.
-     * Matches in order:
-     * 1. Exact match ($rawRow[$qField])
-     * 2. Case-insensitive exact match
-     * 3. Suffix variations (with or without '_TEXT')
+     * Prioritizes respondent text entries (_TEXT) over numeric choice recodes.
+     * Also normalizes question references (e.g., Q4 <-> QID4 <-> QID4_TEXT).
      */
     public static function findQualtricsValue(array $rawRow, string $qField, ?array &$rawLower = null, ?string &$matchedKey = null): mixed
     {
@@ -413,12 +423,6 @@ class FieldMapper
         $qFieldTrimmed = trim($qField);
         if ($qFieldTrimmed === '') {
             return null;
-        }
-
-        // 1. Exact match
-        if (array_key_exists($qFieldTrimmed, $rawRow)) {
-            $matchedKey = $qFieldTrimmed;
-            return $rawRow[$qFieldTrimmed];
         }
 
         // Build lowercase index once
@@ -431,25 +435,67 @@ class FieldMapper
 
         $lowerTarget = strtolower($qFieldTrimmed);
 
-        // 2. Case-insensitive exact match
+        // Candidate search list in priority order
+        $candidates = [];
+
+        // Check if $qFieldTrimmed is a question reference (e.g. Q4, QID4, 4, Q4_TEXT, QID4_TEXT)
+        if (preg_match('/^q(?:id)?_?(\d+)(.*)$/i', $lowerTarget, $m)) {
+            $num = $m[1];
+            $extra = $m[2]; // e.g. '_text' or ''
+            if ($extra === '_text') {
+                $candidates[] = "qid{$num}_text";
+                $candidates[] = "q{$num}_text";
+                $candidates[] = "{$num}_text";
+            } else {
+                // Prefer _text variant first (contains respondent's actual text entry)
+                $candidates[] = "qid{$num}_text";
+                $candidates[] = "q{$num}_text";
+                $candidates[] = "{$num}_text";
+                // Then base keys
+                $candidates[] = "qid{$num}";
+                $candidates[] = "q{$num}";
+                $candidates[] = "{$num}";
+            }
+        } else {
+            if (!str_ends_with($lowerTarget, '_text')) {
+                // Prefer _text variant if present
+                $candidates[] = $lowerTarget . '_text';
+            }
+            $candidates[] = $lowerTarget;
+            if (str_ends_with($lowerTarget, '_text')) {
+                $candidates[] = substr($lowerTarget, 0, -5);
+            }
+        }
+
+        // 1. Check candidates: if candidate is a _text variant, ensure it contains non-empty text
+        foreach ($candidates as $cand) {
+            if (isset($rawLower[$cand])) {
+                $realKey = $rawLower[$cand];
+                $val = $rawRow[$realKey] ?? null;
+                if (str_ends_with($cand, '_text')) {
+                    if ($val !== null && trim((string)$val) !== '') {
+                        $matchedKey = $realKey;
+                        return $val;
+                    }
+                } else {
+                    if ($val !== null && trim((string)$val) !== '') {
+                        $matchedKey = $realKey;
+                        return $val;
+                    }
+                }
+            }
+        }
+
+        // 2. Exact match fallback
+        if (array_key_exists($qFieldTrimmed, $rawRow)) {
+            $matchedKey = $qFieldTrimmed;
+            return $rawRow[$qFieldTrimmed];
+        }
+
+        // 3. Any case-insensitive match (even if empty)
         if (isset($rawLower[$lowerTarget])) {
             $matchedKey = $rawLower[$lowerTarget];
             return $rawRow[$matchedKey];
-        }
-
-        // 3. Suffix tolerance (with or without '_text')
-        if (str_ends_with($lowerTarget, '_text')) {
-            $base = substr($lowerTarget, 0, -5);
-            if (isset($rawLower[$base])) {
-                $matchedKey = $rawLower[$base];
-                return $rawRow[$matchedKey];
-            }
-        } else {
-            $withText = $lowerTarget . '_text';
-            if (isset($rawLower[$withText])) {
-                $matchedKey = $rawLower[$withText];
-                return $rawRow[$matchedKey];
-            }
         }
 
         return null;
@@ -469,7 +515,7 @@ class FieldMapper
         $mappedVals = [];
         foreach ($customMappings as $cm) {
             $val = self::findQualtricsValue($rawRow, $cm['qualtrics_field'], $rawLower);
-            if ($val !== null) {
+            if ($val !== null && trim((string)$val) !== '') {
                 $mappedVals[$cm['redcap_field']] = $val;
             }
         }
@@ -478,9 +524,33 @@ class FieldMapper
         $firstField = $config['dedup_first_name_field'] ?? 'first_name';
         $lastField = $config['dedup_last_name_field'] ?? 'last_name';
 
-        $first = $mappedVals[$firstField] ?? $rawRow[$firstField] ?? $rawRow['first_name'] ?? '';
-        $last = $mappedVals[$lastField] ?? $rawRow[$lastField] ?? $rawRow['last_name'] ?? '';
-        $phone = $mappedVals[$phoneField] ?? $rawRow[$phoneField] ?? $rawRow['phone1'] ?? '';
+        $first = $mappedVals[$firstField]
+            ?? $rawRow[$firstField]
+            ?? $rawRow['first_name']
+            ?? $rawRow['RecipientFirstName']
+            ?? self::findQualtricsValue($rawRow, 'first_name', $rawLower)
+            ?? '';
+
+        $last = $mappedVals[$lastField]
+            ?? $rawRow[$lastField]
+            ?? $rawRow['last_name']
+            ?? $rawRow['RecipientLastName']
+            ?? self::findQualtricsValue($rawRow, 'last_name', $rawLower)
+            ?? '';
+
+        $phone = $mappedVals[$phoneField]
+            ?? $rawRow[$phoneField]
+            ?? $rawRow['phone1']
+            ?? self::findQualtricsValue($rawRow, 'phone1', $rawLower)
+            ?? '';
+
+        // If first or last name is numeric (e.g. '1'), discard it (it's a choice code, not a name)
+        if (is_numeric(trim((string)$first))) {
+            $first = '';
+        }
+        if (is_numeric(trim((string)$last))) {
+            $last = '';
+        }
 
         return [
             'name' => trim(Deduplicator::sanitizeName((string)$first) . ' ' . Deduplicator::sanitizeName((string)$last)),

@@ -218,6 +218,11 @@
                 if (readyCount > 0 || currentData.note_updates_count > 0) {
                     $('#btnRunImport').prop('disabled', false);
                 }
+
+                if (currentData.diagnostics) {
+                    $('#btnDiagnostics').show();
+                    console.log('Qualtrics Import Diagnostics:', currentData.diagnostics);
+                }
             })
             .catch(() => {
                 $('#previewLoading').hide();
@@ -350,6 +355,51 @@
             if (currentData) {
                 renderTable(currentData.evaluations || []);
             }
+        });
+
+        // Diagnostics modal opener
+        $('#btnDiagnostics').on('click', () => {
+            if (!currentData || !currentData.diagnostics) {
+                alert('No diagnostics data available yet. Please refresh the preview.');
+                return;
+            }
+            const diag = currentData.diagnostics;
+
+            // Render custom mappings
+            const $mBody = $('#diagMappingsBody').empty();
+            if (diag.parsed_custom_mappings && diag.parsed_custom_mappings.length > 0) {
+                diag.parsed_custom_mappings.forEach(m => {
+                    const vm = m.value_map && Object.keys(m.value_map).length > 0 ? JSON.stringify(m.value_map) : '<span class="text-muted">None</span>';
+                    $mBody.append(`<tr><td><code>${$('<div>').text(m.qualtrics_field).html()}</code></td><td><code>${$('<div>').text(m.redcap_field).html()}</code></td><td><small>${vm}</small></td></tr>`);
+                });
+            } else {
+                $mBody.append('<tr><td colspan="3" class="text-muted">No custom field mappings configured.</td></tr>');
+            }
+
+            // Render static defaults
+            const $sBody = $('#diagStaticBody').empty();
+            if (diag.parsed_static_defaults && diag.parsed_static_defaults.length > 0) {
+                diag.parsed_static_defaults.forEach(s => {
+                    $sBody.append(`<tr><td><code>${$('<div>').text(s.field_name).html()}</code></td><td><code>${$('<div>').text(s.field_value).html()}</code></td></tr>`);
+                });
+            } else {
+                $sBody.append('<tr><td colspan="2" class="text-muted">No static defaults configured.</td></tr>');
+            }
+
+            // Render available fields
+            const $fCont = $('#diagFieldsContainer').empty();
+            if (diag.qualtrics_fields && diag.qualtrics_fields.length > 0) {
+                diag.qualtrics_fields.forEach(f => {
+                    $fCont.append(`<span class="badge badge-light border m-1 p-1"><code>${$('<div>').text(f).html()}</code></span> `);
+                });
+            } else {
+                $fCont.html('<span class="text-muted">No survey field keys retrieved.</span>');
+            }
+
+            // Render sample JSON
+            $('#diagSampleJson').text(diag.sample_raw_values ? JSON.stringify(diag.sample_raw_values, null, 2) : 'No raw row data available.');
+
+            $('#diagnosticsModal').modal('show');
         });
 
         // Initial preview load if survey is configured
