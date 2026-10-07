@@ -313,6 +313,21 @@ class QualtricsImport extends AbstractExternalModule
                 'scores' => $eval['scores'] ?? null,
             ];
 
+            // If response was mostly blank, append to decision reason and candidate notes
+            $completeness = FieldMapper::analyzeResponseCompleteness($rawRow);
+            if ($completeness['status'] === 'mostly_blank') {
+                $blankNote = "Response was mostly blank ({$completeness['summary']})";
+                $evalSummary['description'] = ($evalSummary['description'] !== '')
+                    ? "{$evalSummary['description']} [{$blankNote}]"
+                    : $blankNote;
+                if (!empty($config['import_notes_field'])) {
+                    $existingNote = $mapped[$config['import_notes_field']] ?? '';
+                    $mapped[$config['import_notes_field']] = ($existingNote !== '')
+                        ? "{$existingNote}; {$blankNote}"
+                        : $blankNote;
+                }
+            }
+
             if ($eval['is_duplicate']) {
                 // Case 3: Update existing record's notes
                 if ($eval['status'] === 'rejected_case_3' && !empty($config['import_notes_field'])) {

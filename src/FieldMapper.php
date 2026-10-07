@@ -53,7 +53,14 @@ class FieldMapper
         if (!empty($config['only_completed'])) {
             $finished = $rawRow['Finished'] ?? $rawRow['finished'] ?? '';
             if ($finished !== '1' && $finished !== 1 && strtolower((string)$finished) !== 'true') {
-                $exclusionReason = "Incomplete response (Finished is '{$finished}')";
+                $completeness = self::analyzeResponseCompleteness($rawRow);
+                if ($completeness['status'] === 'completely_blank') {
+                    $exclusionReason = "Incomplete response: response was completely blank";
+                } elseif ($completeness['status'] === 'mostly_blank') {
+                    $exclusionReason = "Incomplete response: response was {$completeness['summary']}";
+                } else {
+                    $exclusionReason = "Incomplete response (Finished is '{$finished}')";
+                }
                 return null;
             }
         }
@@ -185,7 +192,14 @@ class FieldMapper
         if (!empty($config['filter_logic'])) {
             $evalContext = array_merge($rawRow, $mapped);
             if (!self::evaluateFilterLogic($config['filter_logic'], $evalContext, $projectId)) {
-                $exclusionReason = "Excluded by filter logic: {$config['filter_logic']}";
+                $completeness = self::analyzeResponseCompleteness($rawRow);
+                if ($completeness['status'] === 'completely_blank') {
+                    $exclusionReason = "Excluded by filter logic (response was completely blank)";
+                } elseif ($completeness['status'] === 'mostly_blank') {
+                    $exclusionReason = "Excluded by filter logic (response was {$completeness['summary']})";
+                } else {
+                    $exclusionReason = "Excluded by filter logic: {$config['filter_logic']}";
+                }
                 return null;
             }
         }
@@ -200,7 +214,14 @@ class FieldMapper
             }
         }
         if (!empty($missing)) {
-            $exclusionReason = 'Missing required field(s): ' . implode(', ', $missing);
+            $completeness = self::analyzeResponseCompleteness($rawRow);
+            if ($completeness['status'] === 'completely_blank') {
+                $exclusionReason = 'Response was completely blank (missing required field(s): ' . implode(', ', $missing) . ')';
+            } elseif ($completeness['status'] === 'mostly_blank') {
+                $exclusionReason = 'Response was mostly blank (' . $completeness['summary'] . '; missing required field(s): ' . implode(', ', $missing) . ')';
+            } else {
+                $exclusionReason = 'Missing required field(s): ' . implode(', ', $missing);
+            }
             return null;
         }
 
@@ -555,6 +576,85 @@ class FieldMapper
         return [
             'name' => trim(Deduplicator::sanitizeName((string)$first) . ' ' . Deduplicator::sanitizeName((string)$last)),
             'phone' => AutoSanitizer::formatPhone((string)$phone),
+        ];
+    }
+
+    /**
+     * Analyze whether a Qualtrics response row was completely blank, mostly blank, or answered.
+     *
+     * @param array $rawRow The raw response row from Qualtrics.
+     * @return array [
+     *     'status' => 'completely_blank' | 'mostly_blank' | 'answered',
+     *     'answered_count' => int,
+     *     'total_questions' => int,
+     *     'progress' => ?int,
+     *     'summary' => string
+     * ]
+     */
+    public static function analyzeResponseCompleteness(array $rawRow): array
+    {
+        $metadataLower = array_flip(array_map('strtolower', self::STANDARD_QUALTRICS_METADATA));
+        $metadataLower['resolution'] = true;
+        $metadataLower['_recordid'] = true;
+
+        $totalQuestions = 0;
+        $answeredCount = 0;
+
+        foreach ($rawRow as $key => $val) {
+            $kLower = strtolower(trim((string)$key));
+            if (isset($metadataLower[$kLower])) {
+                continue;
+            }
+            $totalQuestions++;
+            if ($val !== null && trim((string)$val) !== '') {
+                $answeredCount++;
+            }
+        }
+
+        $progress = null;
+        if (isset($rawRow['Progress']) && is_numeric($rawRow['Progress'])) {
+            $progress = (int)$rawRow['Progress'];
+        } elseif (isset($rawRow['progress']) && is_numeric($rawRow['progress'])) {
+            $progress = (int)$rawRow['progress'];
+        }
+
+        if ($answeredCount === 0) {
+            return [
+                'status' => 'completely_blank',
+                'answered_count' => 0,
+                'total_questions' => $totalQuestions,
+                'progress' => $progress,
+                'summary' => 'completely blank (0 survey questions answered)',
+            ];
+        }
+
+        // Mostly blank if 2 or fewer questions answered, or <= 15% answered (for surveys with >= 5 questions),
+        // or if Progress is <= 15%
+        $isMostlyBlank = ($answeredCount <= 2)
+            || ($totalQuestions >= 5 && ($answeredCount / $totalQuestions) <= 0.15)
+            || ($progress !== null && $progress > 0 && $progress <= 15);
+
+        if ($isMostlyBlank) {
+            $summary = "mostly blank ({$answeredCount} of {$totalQuestions} questions answered";
+            if ($progress !== null) {
+                $summary .= ", {$progress}% progress";
+            }
+            $summary .= ')';
+            return [
+                'status' => 'mostly_blank',
+                'answered_count' => $answeredCount,
+                'total_questions' => $totalQuestions,
+                'progress' => $progress,
+                'summary' => $summary,
+            ];
+        }
+
+        return [
+            'status' => 'answered',
+            'answered_count' => $answeredCount,
+            'total_questions' => $totalQuestions,
+            'progress' => $progress,
+            'summary' => "{$answeredCount} of {$totalQuestions} questions answered",
         ];
     }
 }

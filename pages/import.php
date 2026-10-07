@@ -108,7 +108,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                             <div class="d-flex align-items-center">
                                 <input type="checkbox" class="status-checkbox" id="chkStatus_imported" value="imported" checked>
                                 <i class="fas fa-history text-info fa-fw mr-2"></i>
-                                <span class="status-name">Imported (Already in REDCap)</span>
+                                <span class="status-name">Imported</span>
                             </div>
                             <span class="badge badge-info ml-2" id="cntImported">0</span>
                         </label>
@@ -116,7 +116,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                             <div class="d-flex align-items-center">
                                 <input type="checkbox" class="status-checkbox" id="chkStatus_case_4" value="case_4" checked>
                                 <i class="fas fa-user-tag text-primary fa-fw mr-2"></i>
-                                <span class="status-name">Possible Duplicates (Case 4)</span>
+                                <span class="status-name">Possible Duplicates</span>
                             </div>
                             <span class="badge badge-primary ml-2" id="cntCase4">0</span>
                         </label>
@@ -124,7 +124,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                             <div class="d-flex align-items-center">
                                 <input type="checkbox" class="status-checkbox" id="chkStatus_case_2" value="case_2" checked>
                                 <i class="fas fa-clone text-danger fa-fw mr-2"></i>
-                                <span class="status-name">Duplicate Submissions (Case 2)</span>
+                                <span class="status-name">Duplicate Submissions</span>
                             </div>
                             <span class="badge badge-danger ml-2" id="cntCase2">0</span>
                         </label>
@@ -132,7 +132,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                             <div class="d-flex align-items-center">
                                 <input type="checkbox" class="status-checkbox" id="chkStatus_case_3" value="case_3" checked>
                                 <i class="fas fa-users text-warning fa-fw mr-2"></i>
-                                <span class="status-name">Shared Phone Conflicts (Case 3)</span>
+                                <span class="status-name">Shared Phone Conflicts</span>
                             </div>
                             <span class="badge badge-warning ml-2" id="cntCase3">0</span>
                         </label>
@@ -147,12 +147,12 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                     </div>
                 </div>
             </div>
-            <div class="import-search-box" style="min-width: 260px; max-width: 360px;">
+            <div class="import-search-box" style="min-width: 170px; max-width: 280px;">
                 <div class="input-group input-group-sm">
                     <div class="input-group-prepend">
                         <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
                     </div>
-                    <input type="text" id="previewSearch" class="form-control" placeholder="Search table (name, phone, ID, notes)...">
+                    <input type="text" id="previewSearch" class="form-control" placeholder="Search table...">
                     <div class="input-group-append" id="previewSearchClearContainer" style="display: none;">
                         <button class="btn btn-outline-secondary" type="button" id="btnSearchClear" title="Clear search">
                             <i class="fas fa-times"></i>
@@ -168,7 +168,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                 <table class="table table-hover table-striped table-preview mb-0">
                     <thead>
                         <tr>
-                            <th class="sortable" data-sort="status" style="width: 180px;">Status <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable" data-sort="status" style="width: 135px;">Status <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable" data-sort="name">Candidate Name <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable" data-sort="phone">Phone <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable" data-sort="qualtrics_id">Qualtrics ID <i class="fas fa-sort sort-icon"></i></th>

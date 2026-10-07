@@ -2,8 +2,9 @@
 .qualtrics-import-container {
     margin-top: 15px;
     margin-bottom: 30px;
-    margin-right: 20px;
-    max-width: 1400px;
+    margin-right: 15px;
+    max-width: 100%;
+    box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -95,8 +96,8 @@
 }
 
 .status-filter-dropdown .dropdown-menu {
-    min-width: 330px;
-    padding: 10px 12px;
+    min-width: 250px;
+    padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid #dee2e6;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
@@ -217,9 +218,34 @@ th.sortable.sorted-desc .sort-icon {
     opacity: 1;
 }
 
-.import-search-box input:focus {
-    box-shadow: none;
-    border-color: #80bdff;
+.import-search-box .input-group-prepend .input-group-text {
+    border-right: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    background-color: #ffffff !important;
+    border-color: #ced4da;
+    color: #6c757d;
+}
+
+.import-search-box input.form-control {
+    border-left: 0 !important;
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-color: #ced4da;
+}
+
+.import-search-box input.form-control:focus {
+    box-shadow: none !important;
+    border-color: #80bdff !important;
+}
+
+.import-search-box .input-group:focus-within .input-group-text {
+    border-color: #80bdff !important;
+}
+
+.import-search-box .input-group-append .btn {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
 }
 
 .sr-only {
