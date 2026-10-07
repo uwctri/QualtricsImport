@@ -77,7 +77,21 @@
         $tbody.empty();
 
         if (!evaluations || evaluations.length === 0) {
-            $tbody.html('<tr><td colspan="7" class="text-center text-muted p-4">No survey responses found matching criteria.</td></tr>');
+            $tbody.html(`
+                <tr>
+                    <td colspan="8" class="p-0 border-0">
+                        <div class="empty-preview-state text-center">
+                            <div class="empty-icon-wrapper mb-3">
+                                <i class="fas fa-inbox fa-3x text-muted" style="opacity: 0.35;"></i>
+                            </div>
+                            <h5 class="text-secondary font-weight-normal mb-1">No Survey Responses Found</h5>
+                            <p class="text-muted small mb-0" style="max-width: 500px; margin: 0 auto;">
+                                No responses were returned from Qualtrics for the selected date range. Try selecting a different date range or clicking Refresh above.
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+            `);
             $('#tableRecordInfo').html('<span>0 responses</span>');
             return;
         }
@@ -165,10 +179,35 @@
         }
 
         if (filtered.length === 0) {
-            const msg = searchTerm
-                ? `No records matching "<strong>${$('<div>').text(searchTerm).html()}</strong>"`
-                : 'No records found for selected status filter.';
-            $tbody.html(`<tr><td colspan="8" class="text-center text-muted p-4">${msg}</td></tr>`);
+            let emptyIcon = 'fa-filter';
+            let emptyTitle = 'No Responses Matching Filter';
+            let emptyMsg = 'No records matched the selected status filters. Select one or more statuses from the dropdown above to view responses.';
+
+            if (searchTerm) {
+                emptyIcon = 'fa-search';
+                emptyTitle = 'No Matching Records';
+                emptyMsg = `No records matching "<strong>${$('<div>').text(searchTerm).html()}</strong>". Try clearing your search or adjusting your status filters.`;
+            } else if (selectedStatuses.size === 0) {
+                emptyIcon = 'fa-filter';
+                emptyTitle = 'No Statuses Selected';
+                emptyMsg = 'All status filters are unchecked. Click the <strong>Status</strong> dropdown and select at least one status.';
+            }
+
+            $tbody.html(`
+                <tr>
+                    <td colspan="8" class="p-0 border-0">
+                        <div class="empty-preview-state text-center">
+                            <div class="empty-icon-wrapper mb-3">
+                                <i class="fas ${emptyIcon} fa-3x text-muted" style="opacity: 0.35;"></i>
+                            </div>
+                            <h5 class="text-secondary font-weight-normal mb-1">${emptyTitle}</h5>
+                            <p class="text-muted small mb-0" style="max-width: 500px; margin: 0 auto;">
+                                ${emptyMsg}
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+            `);
             return;
         }
 
