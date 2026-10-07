@@ -236,6 +236,29 @@
             ]
         },
         {
+            "key": "default_study_status",
+            "name": "Default Study Status Code (optional; defaults to '1' if not set)",
+            "type": "text"
+        },
+        {
+            "key": "static_field_defaults",
+            "name": "Static Field Defaults / Import Flags",
+            "type": "sub_settings",
+            "repeatable": true,
+            "sub_settings": [
+                {
+                    "key": "field_name",
+                    "name": "Target REDCap Field",
+                    "type": "field-list"
+                },
+                {
+                    "key": "field_value",
+                    "name": "Static Value (e.g., '1', '5', 'today', 'now')",
+                    "type": "text"
+                }
+            ]
+        },
+        {
             "key": "similarity_thresholds_header",
             "name": "<strong>Similarity Thresholds</strong><br><span class='text-muted' style='font-weight:normal;'>These control fuzzy name matching between survey submissions and existing records. They typically do not need to be changed.</span>",
             "type": "descriptive"

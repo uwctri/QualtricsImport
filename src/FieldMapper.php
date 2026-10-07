@@ -121,6 +121,10 @@ class FieldMapper
         }
 
         // 4. Set standard baseline fields
+        $qualtricsIdField = $config['qualtrics_id_field'] ?? 'qualtrics_id';
+        if ($qualtricsIdField !== '') {
+            $mapped[$qualtricsIdField] = $respId;
+        }
         $mapped['qualtrics_id'] = $respId;
         if (!empty($config['target_event'])) {
             $mapped['redcap_event_name'] = $config['target_event'];
@@ -147,6 +151,29 @@ class FieldMapper
         }
 
         $mapped['display_name'] = trim("{$mapped['first_name']} {$mapped['last_name']}");
+
+        // Apply configurable static fields and import flags
+        $today = date('Y-m-d');
+        if (!empty($config['static_field_defaults']) && is_array($config['static_field_defaults'])) {
+            foreach ($config['static_field_defaults'] as $sf) {
+                $sField = trim($sf['field_name'] ?? '');
+                $sVal = trim((string)($sf['field_value'] ?? ''));
+                if ($sField !== '') {
+                    if (strtolower($sVal) === 'today') {
+                        $mapped[$sField] = $today;
+                    } elseif (strtolower($sVal) === 'now') {
+                        $mapped[$sField] = date('Y-m-d H:i:s');
+                    } else {
+                        $mapped[$sField] = $sVal;
+                    }
+                }
+            }
+        }
+
+        // Apply default study status if configured and not already set by static_field_defaults
+        if (!empty($config['default_study_status']) && !isset($mapped['study_status'])) {
+            $mapped['study_status'] = trim((string)$config['default_study_status']);
+        }
 
         // 5. Evaluate REDCap filter logic if configured
         if (!empty($config['filter_logic'])) {

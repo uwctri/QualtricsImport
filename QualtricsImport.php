@@ -317,9 +317,15 @@ class QualtricsImport extends AbstractExternalModule
             );
 
             $mapped[REDCap::getRecordIdField()] = $allocatedId;
-            $mapped['import_date'] = $today;
-            $mapped['first_import_date'] = $today;
-            $mapped['study_status'] = '1';
+            if (!isset($mapped['import_date'])) {
+                $mapped['import_date'] = $today;
+            }
+            if (!isset($mapped['first_import_date'])) {
+                $mapped['first_import_date'] = $today;
+            }
+            if (!isset($mapped['study_status'])) {
+                $mapped['study_status'] = '1';
+            }
 
             if (!empty($eval['candidate_note']) && !empty($config['import_notes_field'])) {
                 $mapped[$config['import_notes_field']] = $eval['candidate_note'];
