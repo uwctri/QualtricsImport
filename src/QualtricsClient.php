@@ -204,6 +204,23 @@ class QualtricsClient
                 $row['ResponseId'] = $item['responseId'];
             }
 
+            // Normalize common metadata keys for consistent PascalCase access
+            if (isset($row['startDate']) && !isset($row['StartDate'])) {
+                $row['StartDate'] = $row['startDate'];
+            }
+            if (isset($row['endDate']) && !isset($row['EndDate'])) {
+                $row['EndDate'] = $row['endDate'];
+            }
+            if (isset($row['recordedDate']) && !isset($row['RecordedDate'])) {
+                $row['RecordedDate'] = $row['recordedDate'];
+            }
+            if (isset($row['finished']) && !isset($row['Finished'])) {
+                $row['Finished'] = $row['finished'];
+            }
+            if (isset($row['progress']) && !isset($row['Progress'])) {
+                $row['Progress'] = $row['progress'];
+            }
+
             // Skip header row if labeled as header
             $respId = (string)($row['ResponseId'] ?? '');
             if (!empty($respId) && str_starts_with($respId, 'R_')) {

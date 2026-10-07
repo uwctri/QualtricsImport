@@ -227,7 +227,15 @@ class QualtricsImport extends AbstractExternalModule
         // 4. Process each survey response
         foreach ($rawSurveyRows as $rawRow) {
             $respId = (string)($rawRow['ResponseId'] ?? '');
-            $startDate = (string)($rawRow['StartDate'] ?? $rawRow['startdate'] ?? $rawRow['RecordedDate'] ?? '');
+            $startDate = (string)(
+                $rawRow['StartDate']
+                ?? $rawRow['startDate']
+                ?? $rawRow['startdate']
+                ?? $rawRow['RecordedDate']
+                ?? $rawRow['recordedDate']
+                ?? $rawRow['recordeddate']
+                ?? ''
+            );
 
             // Pre-check Case 1: Already imported by Qualtrics ResponseId
             $alreadyImported = null;
@@ -250,7 +258,7 @@ class QualtricsImport extends AbstractExternalModule
                     'start_date' => $startDate,
                     'candidate_name' => trim("{$alreadyImported['first_name']} {$alreadyImported['last_name']}"),
                     'candidate_phone' => $alreadyImported['phone1'],
-                    'record_id' => null,
+                    'record_id' => $alreadyImported['record_id'],
                     'matched_record_id' => $alreadyImported['record_id'],
                     'scores' => null,
                 ];

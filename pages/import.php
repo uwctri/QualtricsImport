@@ -173,8 +173,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                             <th class="sortable text-nowrap" data-sort="name" style="width: 140px;">Candidate Name <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable text-nowrap" data-sort="phone" style="width: 115px;">Phone <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable text-nowrap" data-sort="qualtrics_id" style="width: 110px;">Qualtrics ID <i class="fas fa-sort sort-icon"></i></th>
-                            <th class="sortable text-nowrap" data-sort="record_id" style="width: 85px;">Record ID <i class="fas fa-sort sort-icon"></i></th>
-                            <th class="sortable text-nowrap" data-sort="matched" style="width: 130px;">Matched / Score <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable text-nowrap" data-sort="record_id" style="width: 90px;">Record ID <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable" data-sort="description">Decision Reason / Notes <i class="fas fa-sort sort-icon"></i></th>
                         </tr>
                     </thead>

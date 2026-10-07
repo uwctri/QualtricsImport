@@ -79,7 +79,7 @@
         if (!evaluations || evaluations.length === 0) {
             $tbody.html(`
                 <tr>
-                    <td colspan="8" class="p-0 border-0">
+                    <td colspan="7" class="p-0 border-0">
                         <div class="empty-preview-state text-center">
                             <div class="empty-icon-wrapper mb-3">
                                 <i class="fas fa-inbox fa-3x text-muted" style="opacity: 0.35;"></i>
@@ -195,7 +195,7 @@
 
             $tbody.html(`
                 <tr>
-                    <td colspan="8" class="p-0 border-0">
+                    <td colspan="7" class="p-0 border-0">
                         <div class="empty-preview-state text-center">
                             <div class="empty-icon-wrapper mb-3">
                                 <i class="fas ${emptyIcon} fa-3x text-muted" style="opacity: 0.35;"></i>
@@ -212,12 +212,6 @@
         }
 
         filtered.forEach(row => {
-            let scoresHtml = '-';
-            if (row.scores) {
-                scoresHtml = `<span class="similarity-score">F: ${(row.scores.first * 100).toFixed(0)}% / L: ${(row.scores.last * 100).toFixed(0)}%</span>`;
-            }
-
-            const matchedRecord = row.matched_record_id ? `Record ${row.matched_record_id}` : '-';
             const allocatedId = row.record_id ? `<strong>${row.record_id}</strong>` : '<span class="text-muted">-</span>';
 
             const tr = `
@@ -228,7 +222,6 @@
                     <td class="text-nowrap">${formatPhone(row.candidate_phone)}</td>
                     <td><small class="text-muted">${row.qualtrics_id}</small></td>
                     <td>${allocatedId}</td>
-                    <td>${matchedRecord} ${scoresHtml !== '-' ? '<br>' + scoresHtml : ''}</td>
                     <td><small>${row.description}</small></td>
                 </tr>
             `;
