@@ -1,4 +1,8 @@
 /* Styling for Qualtrics Import UI */
+#center {
+    min-width: 0 !important;
+}
+
 .qualtrics-import-container {
     margin-top: 15px;
     margin-bottom: 30px;
@@ -9,7 +13,6 @@
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-    overflow-x: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -17,6 +20,7 @@
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+    min-width: 0;
 }
 
 .qualtrics-card {
@@ -28,6 +32,8 @@
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+    overflow: hidden;
+    min-width: 0;
 }
 
 .qualtrics-card-header {
@@ -221,13 +227,13 @@
 }
 
 .table-preview td {
-    padding: 7px 10px;
+    padding: 6px 8px;
     vertical-align: middle;
 }
 
 .table-preview td:last-child {
     word-break: break-word;
-    min-width: 180px;
+    min-width: 140px;
 }
 
 th.sortable {
