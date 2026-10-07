@@ -34,6 +34,18 @@
             };
             $modal.find('select[name="record_id_strategy"]').off('change.strat').on('change.strat', updateStrategyVisibility);
             updateStrategyVisibility();
+
+            // Hide sync_frequency if automated background imports are not enabled
+            const updateSyncFreqVisibility = () => {
+                const isEnabled = $modal.find('input[name="import_enabled"]').is(':checked');
+                if (isEnabled) {
+                    $modal.find('[field="sync_frequency"]').show();
+                } else {
+                    $modal.find('[field="sync_frequency"]').hide();
+                }
+            };
+            $modal.find('input[name="import_enabled"]').off('change.sync_freq').on('change.sync_freq', updateSyncFreqVisibility);
+            updateSyncFreqVisibility();
         };
     });
 

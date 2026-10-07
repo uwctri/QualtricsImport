@@ -212,12 +212,13 @@ class QualtricsImport extends AbstractExternalModule
 
         // 4. Process each survey response
         foreach ($rawSurveyRows as $rawRow) {
-            $mapped = FieldMapper::mapRecord($rawRow, $config, $fieldNames, $dict, $projectId);
+            $exclusionReason = null;
+            $mapped = FieldMapper::mapRecord($rawRow, $config, $fieldNames, $dict, $projectId, $exclusionReason);
             if ($mapped === null) {
                 $evaluations[] = [
                     'category' => 'Ineligible / Missing Fields',
                     'status' => 'skipped_ineligible',
-                    'description' => 'Response excluded by filter logic or missing required fields',
+                    'description' => $exclusionReason ?: 'Response excluded by filter logic or missing required fields',
                     'qualtrics_id' => (string)($rawRow['ResponseId'] ?? ''),
                     'candidate_name' => trim(($rawRow['first_name'] ?? '') . ' ' . ($rawRow['last_name'] ?? '')),
                     'candidate_phone' => (string)($rawRow['phone1'] ?? ''),
@@ -233,7 +234,7 @@ class QualtricsImport extends AbstractExternalModule
                         'candidate_name' => trim(($rawRow['first_name'] ?? '') . ' ' . ($rawRow['last_name'] ?? '')),
                         'candidate_phone' => (string)($rawRow['phone1'] ?? ''),
                         'status' => 'skipped_ineligible',
-                        'reason' => 'Excluded by filter logic, completion status, or missing required fields',
+                        'reason' => $exclusionReason ?: 'Excluded by filter logic, completion status, or missing required fields',
                     ]);
                 }
                 continue;
@@ -322,10 +323,7 @@ class QualtricsImport extends AbstractExternalModule
             }
             if (!isset($mapped['first_import_date'])) {
                 $mapped['first_import_date'] = $today;
-            }
-            if (!isset($mapped['study_status'])) {
-                $mapped['study_status'] = '1';
-            }
+
 
             if (!empty($eval['candidate_note']) && !empty($config['import_notes_field'])) {
                 $mapped[$config['import_notes_field']] = $eval['candidate_note'];

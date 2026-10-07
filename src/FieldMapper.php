@@ -39,10 +39,13 @@ class FieldMapper
         array $config,
         array $redcapFieldNames = [],
         array $redcapMetadata = [],
-        ?int $projectId = null
+        ?int $projectId = null,
+        ?string &$exclusionReason = null
     ): ?array {
+        $exclusionReason = null;
         $respId = (string)($rawRow['ResponseId'] ?? '');
         if (!str_starts_with($respId, 'R_')) {
+            $exclusionReason = "ResponseId does not start with 'R_' ({$respId})";
             return null;
         }
 
@@ -50,6 +53,7 @@ class FieldMapper
         if (!empty($config['only_completed'])) {
             $finished = $rawRow['Finished'] ?? $rawRow['finished'] ?? '';
             if ($finished !== '1' && $finished !== 1 && strtolower((string)$finished) !== 'true') {
+                $exclusionReason = "Incomplete response (Finished is '{$finished}')";
                 return null;
             }
         }
@@ -170,15 +174,13 @@ class FieldMapper
             }
         }
 
-        // Apply default study status if configured and not already set by static_field_defaults
-        if (!empty($config['default_study_status']) && !isset($mapped['study_status'])) {
-            $mapped['study_status'] = trim((string)$config['default_study_status']);
-        }
+
 
         // 5. Evaluate REDCap filter logic if configured
         if (!empty($config['filter_logic'])) {
             $evalContext = array_merge($rawRow, $mapped);
             if (!self::evaluateFilterLogic($config['filter_logic'], $evalContext, $projectId)) {
+                $exclusionReason = "Excluded by filter logic: {$config['filter_logic']}";
                 return null;
             }
         }
@@ -186,10 +188,15 @@ class FieldMapper
         // 6. Verify required fields
         $reqFieldsRaw = $config['required_fields'] ?? 'phone1,first_name,last_name';
         $requiredFields = array_filter(array_map('trim', explode(',', $reqFieldsRaw)));
+        $missing = [];
         foreach ($requiredFields as $rf) {
             if (!isset($mapped[$rf]) || trim((string)$mapped[$rf]) === '') {
-                return null;
+                $missing[] = $rf;
             }
+        }
+        if (!empty($missing)) {
+            $exclusionReason = 'Missing required field(s): ' . implode(', ', $missing);
+            return null;
         }
 
         return $mapped;

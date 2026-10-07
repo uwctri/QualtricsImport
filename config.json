@@ -101,7 +101,11 @@
                 { "value": "3600", "name": "Hourly" },
                 { "value": "86400", "name": "Daily" }
             ],
-            "default": "3600"
+            "default": "3600",
+            "branchingLogic": {
+                "field": "import_enabled",
+                "value": "1"
+            }
         },
         {
             "key": "target_header",
@@ -234,11 +238,7 @@
                     "type": "text"
                 }
             ]
-        },
-        {
-            "key": "default_study_status",
-            "name": "Default Study Status Code (optional; defaults to '1' if not set)",
-            "type": "text"
+
         },
         {
             "key": "static_field_defaults",

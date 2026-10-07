@@ -4,6 +4,9 @@
 
     let currentData = null;
     let activeFilter = 'all';
+    let searchTerm = '';
+    let sortColumn = null;
+    let sortDirection = 'asc';
 
     const formatPhone = (phone) => {
         if (!phone) return '';
@@ -31,10 +34,12 @@
 
         if (!evaluations || evaluations.length === 0) {
             $tbody.html('<tr><td colspan="7" class="text-center text-muted p-4">No survey responses found matching criteria.</td></tr>');
+            $('#tableRecordInfo').html('<span>0 responses</span>');
             return;
         }
 
-        const filtered = evaluations.filter(item => {
+        // 1. Filter by category pill
+        let filtered = evaluations.filter(item => {
             if (activeFilter === 'all') return true;
             if (activeFilter === 'ready' && (item.status === 'accepted_clean' || item.status === 'accepted_case_4')) return true;
             if (activeFilter === 'clean' && item.status === 'accepted_clean') return true;
@@ -45,8 +50,77 @@
             return false;
         });
 
+        const pillTotal = filtered.length;
+
+        // 2. Filter by search term across all columns
+        if (searchTerm) {
+            const query = searchTerm.toLowerCase();
+            filtered = filtered.filter(item => {
+                const searchCorpus = [
+                    item.category || '',
+                    item.status || '',
+                    item.candidate_name || '',
+                    item.candidate_phone || '',
+                    item.qualtrics_id || '',
+                    item.record_id || '',
+                    item.matched_record_id || '',
+                    item.description || ''
+                ].join(' ').toLowerCase();
+                return searchCorpus.includes(query);
+            });
+        }
+
+        // 3. Sort by active column
+        if (sortColumn) {
+            filtered.sort((a, b) => {
+                let comp = 0;
+                switch (sortColumn) {
+                    case 'status':
+                        comp = (a.category || '').localeCompare(b.category || '', undefined, { sensitivity: 'base' });
+                        break;
+                    case 'name':
+                        comp = (a.candidate_name || '').localeCompare(b.candidate_name || '', undefined, { sensitivity: 'base' });
+                        break;
+                    case 'phone':
+                        const pA = String(a.candidate_phone || '').replace(/\D/g, '');
+                        const pB = String(b.candidate_phone || '').replace(/\D/g, '');
+                        comp = pA.localeCompare(pB, undefined, { numeric: true });
+                        break;
+                    case 'qualtrics_id':
+                        comp = (a.qualtrics_id || '').localeCompare(b.qualtrics_id || '', undefined, { numeric: true, sensitivity: 'base' });
+                        break;
+                    case 'record_id':
+                        const rA = parseInt(a.record_id, 10) || 0;
+                        const rB = parseInt(b.record_id, 10) || 0;
+                        comp = rA - rB;
+                        break;
+                    case 'matched':
+                        const mA = parseInt(a.matched_record_id, 10) || 0;
+                        const mB = parseInt(b.matched_record_id, 10) || 0;
+                        comp = mA - mB;
+                        break;
+                    case 'description':
+                        comp = (a.description || '').localeCompare(b.description || '', undefined, { sensitivity: 'base' });
+                        break;
+                }
+                return sortDirection === 'asc' ? comp : -comp;
+            });
+        }
+
+        // Update footer info
+        if (searchTerm) {
+            $('#tableRecordInfo').html(`<span>Showing <strong>${filtered.length}</strong> of ${pillTotal} responses (${evaluations.length} total)</span>`);
+        } else if (pillTotal < evaluations.length) {
+            $('#tableRecordInfo').html(`<span>Showing <strong>${filtered.length}</strong> of ${evaluations.length} total responses</span>`);
+        } else {
+            $('#tableRecordInfo').html(`<span>Showing all <strong>${filtered.length}</strong> responses</span>`);
+        }
+
         if (filtered.length === 0) {
-            $tbody.html('<tr><td colspan="7" class="text-center text-muted p-4">No records found for selected filter.</td></tr>');
+            const msg = searchTerm
+                ? `No records matching "<strong>${$('<div>').text(searchTerm).html()}</strong>"`
+                : 'No records found for selected filter.';
+            $tbody.html(`<tr><td colspan="7" class="text-center text-muted p-4">${msg}</td></tr>`);
             return;
         }
 
@@ -224,6 +298,55 @@
             $('.filter-pill').removeClass('active');
             $(this).addClass('active');
             activeFilter = $(this).data('filter');
+            if (currentData) {
+                renderTable(currentData.evaluations || []);
+            }
+        });
+
+        // Search input handler
+        $('#previewSearch').on('input', function () {
+            searchTerm = $(this).val().trim();
+            if (searchTerm) {
+                $('#previewSearchClearContainer').show();
+            } else {
+                $('#previewSearchClearContainer').hide();
+            }
+            if (currentData) {
+                renderTable(currentData.evaluations || []);
+            }
+        });
+
+        // Clear search input
+        $('#btnSearchClear').on('click', () => {
+            $('#previewSearch').val('');
+            searchTerm = '';
+            $('#previewSearchClearContainer').hide();
+            if (currentData) {
+                renderTable(currentData.evaluations || []);
+            }
+            $('#previewSearch').focus();
+        });
+
+        // Column header sort handler
+        $(document).on('click', 'th.sortable', function () {
+            const col = $(this).data('sort');
+            if (sortColumn === col) {
+                sortDirection = (sortDirection === 'asc') ? 'desc' : 'asc';
+            } else {
+                sortColumn = col;
+                sortDirection = 'asc';
+            }
+
+            // Reset all column header states
+            $('th.sortable').removeClass('sorted-asc sorted-desc');
+            $('th.sortable .sort-icon').removeClass('fa-sort-up fa-sort-down text-primary').addClass('fa-sort');
+
+            // Apply active sort indicator
+            const $thisTh = $(this);
+            $thisTh.addClass(sortDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+            const $icon = $thisTh.find('.sort-icon');
+            $icon.removeClass('fa-sort').addClass(sortDirection === 'asc' ? 'fa-sort-up text-primary' : 'fa-sort-down text-primary');
+
             if (currentData) {
                 renderTable(currentData.evaluations || []);
             }
