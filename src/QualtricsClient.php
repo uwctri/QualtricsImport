@@ -80,6 +80,38 @@ class QualtricsClient
     }
 
     /**
+     * Retrieve question DataExportTag mapping for a survey definition.
+     * Maps QID (e.g., 'QID29') => DataExportTag (e.g., 'first_name').
+     */
+    public function getSurveyQuestionTags(string $surveyId): array
+    {
+        $response = $this->request('GET', "survey-definitions/{$surveyId}");
+        $questions = $response['result']['Questions'] ?? [];
+        $tagMap = [];
+
+        foreach ($questions as $qid => $q) {
+            $tag = trim((string)($q['DataExportTag'] ?? ''));
+            if ($tag === '') {
+                continue;
+            }
+            $qidClean = strtoupper(trim((string)$qid));
+            $tagMap[$qidClean] = $tag;
+
+            // Also map any SubQuestions if present
+            if (!empty($q['SubQuestions']) && is_array($q['SubQuestions'])) {
+                foreach ($q['SubQuestions'] as $subId => $subQ) {
+                    $subTag = trim((string)($subQ['DataExportTag'] ?? ''));
+                    if ($subTag !== '') {
+                        $tagMap[strtoupper((string)$subId)] = $subTag;
+                    }
+                }
+            }
+        }
+
+        return $tagMap;
+    }
+
+    /**
      * Perform asynchronous export of survey responses from Qualtrics.
      *
      * @param string $surveyId Qualtrics Survey ID (e.g., SV_...)
@@ -94,6 +126,15 @@ class QualtricsClient
         ];
         if (!empty($startDate)) {
             $payload['startDate'] = $startDate;
+        }
+
+        // Fetch survey question DataExportTags for automatic column resolution
+        $tagMap = [];
+        try {
+            $tagMap = $this->getSurveyQuestionTags($surveyId);
+        } catch (Exception) {
+            // Gracefully continue without tag translation if survey-definitions is not accessible
+            $tagMap = [];
         }
 
         // Step 1: Initiate export job
@@ -143,13 +184,13 @@ class QualtricsClient
         }
 
         // Step 4: Decompress ZIP and parse JSON
-        return $this->extractResponsesFromZip($zipData);
+        return $this->extractResponsesFromZip($zipData, $tagMap);
     }
 
     /**
      * Unpack ZIP archive in memory and parse JSON responses.
      */
-    private function extractResponsesFromZip(string $zipContent): array
+    private function extractResponsesFromZip(string $zipContent, array $tagMap = []): array
     {
         $tempZip = tempnam(sys_get_temp_dir(), 'qtr_');
         file_put_contents($tempZip, $zipContent);
@@ -181,7 +222,21 @@ class QualtricsClient
         }
 
         $rawResponses = $decoded['responses'] ?? $decoded;
+        return self::normalizeResponses($rawResponses, $tagMap);
+    }
+
+    /**
+     * Normalize raw Qualtrics response items and optionally translate QID keys to DataExportTags.
+     */
+    public static function normalizeResponses(array $rawResponses, array $tagMap = []): array
+    {
         $normalizedRows = [];
+
+        // Build uppercase lookup for tag map
+        $tagLookup = [];
+        foreach ($tagMap as $k => $v) {
+            $tagLookup[strtoupper(trim((string)$k))] = trim((string)$v);
+        }
 
         foreach ($rawResponses as $idx => $item) {
             if (!is_array($item)) {
@@ -226,6 +281,61 @@ class QualtricsClient
             if (empty($respId) || !str_starts_with($respId, 'R_')) {
                 continue;
             }
+
+            // Translate QID keys using DataExportTag mapping if available
+            if (!empty($tagLookup)) {
+                foreach ($row as $k => $v) {
+                    $kUpper = strtoupper(trim((string)$k));
+                    $baseQid = null;
+                    $sub = '';
+
+                    if (isset($tagLookup[$kUpper])) {
+                        $tag = $tagLookup[$kUpper];
+                        if (!isset($row[$tag]) || trim((string)$row[$tag]) === '') {
+                            $row[$tag] = $v;
+                        }
+                        continue;
+                    }
+
+                    // Check for QID_TEXT or QID_<suffix> (e.g. QID29_TEXT or QID10_1)
+                    if (preg_match('/^(Q(?:ID)?\d+)_(.+)$/i', $k, $m)) {
+                        $rawBase = strtoupper($m[1]);
+                        $sub = $m[2];
+
+                        // Normalize Q29 <-> QID29
+                        $candQids = [$rawBase];
+                        if (str_starts_with($rawBase, 'QID')) {
+                            $candQids[] = 'Q' . substr($rawBase, 3);
+                        } else {
+                            $candQids[] = 'QID' . substr($rawBase, 1);
+                        }
+
+                        foreach ($candQids as $cand) {
+                            if (isset($tagLookup[$cand])) {
+                                $baseQid = $cand;
+                                break;
+                            }
+                        }
+
+                        if ($baseQid !== null) {
+                            $tag = $tagLookup[$baseQid];
+                            if (strtoupper($sub) === 'TEXT') {
+                                $row[$tag . '_TEXT'] = $v;
+                                // Respondent text entries take precedence over choice codes if non-empty
+                                if (trim((string)$v) !== '') {
+                                    $row[$tag] = $v;
+                                }
+                            } else {
+                                $row["{$tag}_{$sub}"] = $v;
+                                if (is_numeric($sub)) {
+                                    $row["{$tag}___{$sub}"] = $v;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             $normalizedRows[] = $row;
         }
 

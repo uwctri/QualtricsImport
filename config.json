@@ -214,6 +214,11 @@
             "type": "descriptive"
         },
         {
+            "key": "auto_populated_fields_blurb",
+            "name": "<div class='alert alert-info' style='margin-bottom:0; font-size:12px; font-weight:normal; line-height:1.5;'><strong>Auto-Populated Fields:</strong><br>If these variables exist in your REDCap project, they are automatically populated during import:<ul><li><code>display_name</code> &ndash; Concatenated respondent name (<code>[first_name] [last_name]</code>).</li><li><code>import_date</code> &amp; <code>first_import_date</code> &ndash; Current date of import (<code>YYYY-MM-DD</code>).</li><li><code>qualtrics_id</code> &ndash; The Qualtrics ResponseId (e.g. <code>R_...</code>).</li></ul><strong>Special Formatting for Static Field Defaults:</strong><br>Under <em>Static Field Defaults / Import Flags</em> below, you can populate any REDCap field with special dynamic keywords:<ul><li><code>today</code> &ndash; Inserts today's date in <code>YYYY-MM-DD</code> format.</li><li><code>now</code> &ndash; Inserts the current timestamp in <code>YYYY-MM-DD HH:MM:SS</code> format.</li><li>Static numbers or text (e.g., <code>1</code> for an import flag checkbox/radio).</li></ul></div>",
+            "type": "descriptive"
+        },
+        {
             "key": "mapping_mode",
             "name": "Field Mapping Mode",
             "type": "dropdown",
@@ -270,7 +275,7 @@
         },
         {
             "key": "static_field_defaults",
-            "name": "Static Field Defaults / Import Flags",
+            "name": "Static Field Defaults / Import Flags<br><span class='text-muted' style='font-weight:normal; font-size:11px;'>Set static values (e.g., '1') or dynamic keywords (<code>today</code>, <code>now</code>).</span>",
             "type": "sub_settings",
             "repeatable": true,
             "sub_settings": [
@@ -281,7 +286,7 @@
                 },
                 {
                     "key": "field_value",
-                    "name": "Static Value (e.g., '1', '5', 'today', 'now')",
+                    "name": "Static Value / Keyword (e.g., '1', 'today', 'now')",
                     "type": "text"
                 }
             ]
