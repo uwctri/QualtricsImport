@@ -221,11 +221,12 @@ class QualtricsClient
                 $row['Progress'] = $row['progress'];
             }
 
-            // Skip header row if labeled as header
+            // Skip header or non-response rows
             $respId = (string)($row['ResponseId'] ?? '');
-            if (!empty($respId) && str_starts_with($respId, 'R_')) {
-                $normalizedRows[] = $row;
+            if (empty($respId) || !str_starts_with($respId, 'R_')) {
+                continue;
             }
+            $normalizedRows[] = $row;
         }
 
         return $normalizedRows;

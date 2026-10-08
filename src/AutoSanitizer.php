@@ -125,10 +125,8 @@ class AutoSanitizer
         if (strlen($digits) === 11 && str_starts_with($digits, '1')) {
             $digits = substr($digits, 1);
         }
-        if ($validate) {
-            if (!self::isValidPhone($digits)) {
-                return '';
-            }
+        if ($validate && !self::isValidPhone($digits)) {
+            return '';
         }
         return $digits;
     }
@@ -139,10 +137,10 @@ class AutoSanitizer
     public static function formatPhone($phone): string
     {
         $digits = self::sanitizePhone($phone);
-        if (strlen($digits) === 10) {
-            return sprintf('(%s) %s-%s', substr($digits, 0, 3), substr($digits, 3, 3), substr($digits, 6, 4));
+        if (strlen($digits) !== 10) {
+            return (string)$phone;
         }
-        return (string)$phone;
+        return sprintf('(%s) %s-%s', substr($digits, 0, 3), substr($digits, 3, 3), substr($digits, 6, 4));
     }
 
     /**

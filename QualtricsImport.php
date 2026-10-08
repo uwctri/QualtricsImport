@@ -3,6 +3,7 @@
 namespace UWMadison\QualtricsImport;
 
 use ExternalModules\AbstractExternalModule;
+use ExternalModules\ExternalModules;
 use REDCap;
 use Exception;
 use Throwable;
@@ -16,16 +17,87 @@ require_once __DIR__ . '/src/RecordManager.php';
 class QualtricsImport extends AbstractExternalModule
 {
     /**
+     * REDCap hook to check if the module link should be displayed to the current user in project navigation.
+     */
+    public function redcap_module_link_check_display($project_id, $link)
+    {
+        return $this->hasImportPermission((int)$project_id) ? $link : null;
+    }
+
+    /**
+     * Check if the current user has permission to access Qualtrics Import for a project.
+     */
+    public function hasImportPermission(int $projectId, ?string $username = null): bool
+    {
+        if (ExternalModules::isSuperUser()) {
+            return true;
+        }
+
+        $username = $username ?: ExternalModules::getUsername();
+        if (empty($username)) {
+            return false;
+        }
+
+        $userRights = REDCap::getUserRights($username)[$username] ?? null;
+        if (empty($userRights)) {
+            return false;
+        }
+
+        $permissionLevel = (string)($this->getProjectSetting('link_display_permission', $projectId) ?: 'all');
+        $allowedUsers = (array)($this->getProjectSetting('allowed_users', $projectId) ?: []);
+
+        return self::checkUserPermission(
+            $permissionLevel,
+            $userRights,
+            $username,
+            false,
+            $allowedUsers
+        );
+    }
+
+    /**
+     * Pure permission evaluation logic (unit testable).
+     */
+    public static function checkUserPermission(
+        string $permissionLevel,
+        array $userRights,
+        string $username,
+        bool $isSuperUser = false,
+        array $allowedUsers = []
+    ): bool {
+        if ($isSuperUser) {
+            return true;
+        }
+
+        if (empty($username) || empty($userRights)) {
+            return false;
+        }
+
+        return match ($permissionLevel) {
+            'design' => !empty($userRights['design']),
+            'data_import_tool' => !empty($userRights['data_import_tool']) || !empty($userRights['design']),
+            'record_create' => !empty($userRights['record_create']) || !empty($userRights['design']),
+            'custom_users' => (function () use ($allowedUsers, $username) {
+                $clean = array_map('strtolower', array_map('strval', array_filter($allowedUsers)));
+                return in_array(strtolower($username), $clean, true);
+            })(),
+            default => true, // 'all' (default)
+        };
+    }
+
+    /**
      * Hook called at top of every page.
      */
     public function redcap_every_page_top()
     {
-        if ($this->isPage('ExternalModules/manager/project.php')) {
-            $this->initializeJavascriptModuleObject();
-            $this->passArgument('prefix', $this->PREFIX);
-            $this->passArgument('allowProjectOverrides', (bool)$this->getSystemSetting('allow_project_overrides'));
-            $this->includeJs('js/config_modal.js', 'defer');
+        if (!$this->isPage('ExternalModules/manager/project.php')) {
+            return;
         }
+
+        $this->initializeJavascriptModuleObject();
+        $this->passArgument('prefix', $this->PREFIX);
+        $this->passArgument('allowProjectOverrides', (bool)$this->getSystemSetting('allow_project_overrides'));
+        $this->includeJs('js/config_modal.js', 'defer');
     }
 
     /**
@@ -33,19 +105,19 @@ class QualtricsImport extends AbstractExternalModule
      */
     public function redcap_module_configuration_settings($project_id, $settings)
     {
-        if ($project_id && !$this->getSystemSetting('allow_project_overrides')) {
-            $keysToRemove = [
-                'override_credentials',
-                'project_qualtrics_api_token',
-                'project_qualtrics_data_center',
-            ];
-
-            $settings = array_values(array_filter($settings, function ($s) use ($keysToRemove) {
-                return !in_array($s['key'] ?? '', $keysToRemove, true);
-            }));
+        if (!$project_id || $this->getSystemSetting('allow_project_overrides')) {
+            return $settings;
         }
 
-        return $settings;
+        $keysToRemove = [
+            'override_credentials',
+            'project_qualtrics_api_token',
+            'project_qualtrics_data_center',
+        ];
+
+        return array_values(array_filter($settings, function ($s) use ($keysToRemove) {
+            return !in_array($s['key'] ?? '', $keysToRemove, true);
+        }));
     }
 
     /**
@@ -53,6 +125,10 @@ class QualtricsImport extends AbstractExternalModule
      */
     public function redcap_module_ajax($action, $payload, $project_id)
     {
+        if (!$this->hasImportPermission((int)$project_id)) {
+            throw new Exception("You do not have permission to access Qualtrics Import for this project.");
+        }
+
         $limit = isset($payload['limit']) ? max(1, min(10000, (int)$payload['limit'])) : 1000;
         $sinceType = (string)($payload['sinceType'] ?? 'auto');
         $customStartDate = !empty($payload['startDate']) ? (string)$payload['startDate'] : null;
@@ -460,16 +536,18 @@ class QualtricsImport extends AbstractExternalModule
         ];
 
         // 5. Commit to REDCap if not dry run
-        if (!$isDryRun) {
-            $results['commit_results'] = RecordManager::commitImports($projectId, $newRecordsToSave, $noteUpdatesToSave);
-            $this->setProjectSetting('last_successful_sync_time', gmdate('Y-m-d\TH:i:s\Z'), $projectId);
-            $this->log("Qualtrics Import completed for project {$projectId}", [
-                'project_id' => $projectId,
-                'imported_count' => count($newRecordsToSave),
-                'notes_updated_count' => count($noteUpdatesToSave),
-                'counts' => json_encode($results['counts']),
-            ]);
+        if ($isDryRun) {
+            return $results;
         }
+
+        $results['commit_results'] = RecordManager::commitImports($projectId, $newRecordsToSave, $noteUpdatesToSave);
+        $this->setProjectSetting('last_successful_sync_time', gmdate('Y-m-d\TH:i:s\Z'), $projectId);
+        $this->log("Qualtrics Import completed for project {$projectId}", [
+            'project_id' => $projectId,
+            'imported_count' => count($newRecordsToSave),
+            'notes_updated_count' => count($noteUpdatesToSave),
+            'counts' => json_encode($results['counts']),
+        ]);
 
         return $results;
     }

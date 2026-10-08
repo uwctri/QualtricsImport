@@ -5,6 +5,11 @@ namespace UWMadison\QualtricsImport;
 /** @var QualtricsImport $module */
 $projectId = (int)$module->getProjectId();
 
+if (!$module->hasImportPermission($projectId)) {
+    echo "<div class='alert alert-danger m-4 p-3 font-weight-bold'><i class='fas fa-exclamation-triangle'></i> Access Denied: You do not have permission to access Qualtrics Import for this project.</div>";
+    return;
+}
+
 $surveyId = trim((string)$module->getProjectSetting('qualtrics_survey_id', $projectId));
 $hasSurveyId = !empty($surveyId);
 

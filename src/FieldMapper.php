@@ -98,21 +98,16 @@ class FieldMapper
         // In auto_map_blacklist mode, auto-map any remaining raw keys that directly match REDCap fields
         if ($mappingMode !== 'whitelist') {
             foreach ($rawRow as $key => $val) {
-                if (isset($matchedRawKeys[$key])) {
+                if (isset($matchedRawKeys[$key]) || isset($mapped[$key])) {
                     continue;
                 }
                 if (in_array($key, self::STANDARD_QUALTRICS_METADATA, true) || in_array($key, $skipFields, true)) {
                     continue;
                 }
-
-                $targetField = $key;
-                if (!empty($redcapFieldNames) && !in_array($targetField, $redcapFieldNames, true)) {
+                if (!empty($redcapFieldNames) && !in_array($key, $redcapFieldNames, true)) {
                     continue;
                 }
-
-                if (!isset($mapped[$targetField])) {
-                    $mapped[$targetField] = $val;
-                }
+                $mapped[$key] = $val;
             }
         }
 
@@ -171,18 +166,19 @@ class FieldMapper
         foreach ($staticDefaults as $sf) {
             $sField = $sf['field_name'];
             $sVal = $sf['field_value'];
-            if ($sField !== '') {
-                // Protect core demographic fields from being overwritten by numeric flags (e.g. import flag = 1)
-                if (in_array($sField, ['first_name', 'last_name'], true) && is_numeric($sVal)) {
-                    continue;
-                }
-                if (strtolower($sVal) === 'today') {
-                    $mapped[$sField] = $today;
-                } elseif (strtolower($sVal) === 'now') {
-                    $mapped[$sField] = date('Y-m-d H:i:s');
-                } else {
-                    $mapped[$sField] = $sVal;
-                }
+            if ($sField === '') {
+                continue;
+            }
+            // Protect core demographic fields from being overwritten by numeric flags (e.g. import flag = 1)
+            if (in_array($sField, ['first_name', 'last_name'], true) && is_numeric($sVal)) {
+                continue;
+            }
+            if (strtolower($sVal) === 'today') {
+                $mapped[$sField] = $today;
+            } elseif (strtolower($sVal) === 'now') {
+                $mapped[$sField] = date('Y-m-d H:i:s');
+            } else {
+                $mapped[$sField] = $sVal;
             }
         }
 
@@ -334,20 +330,22 @@ class FieldMapper
 
         if (!empty($config['custom_value_mappings']) && is_array($config['custom_value_mappings'])) {
             $isAssocList = false;
-            foreach ($config['custom_value_mappings'] as $idx => $row) {
-                if (is_array($row) && (isset($row['qualtrics_field']) || isset($row['redcap_field']))) {
-                    $isAssocList = true;
-                    $qField = trim((string)($row['qualtrics_field'] ?? ''));
-                    $rField = trim((string)($row['redcap_field'] ?? ''));
-                    $vJson = $row['value_map_json'] ?? '';
-                    if ($qField !== '' && $rField !== '') {
-                        $mappings[] = [
-                            'qualtrics_field' => $qField,
-                            'redcap_field' => $rField,
-                            'value_map' => self::parseValueMap($vJson),
-                        ];
-                    }
+            foreach ($config['custom_value_mappings'] as $row) {
+                if (!is_array($row) || (!isset($row['qualtrics_field']) && !isset($row['redcap_field']))) {
+                    continue;
                 }
+                $isAssocList = true;
+                $qField = trim((string)($row['qualtrics_field'] ?? ''));
+                $rField = trim((string)($row['redcap_field'] ?? ''));
+                $vJson = $row['value_map_json'] ?? '';
+                if ($qField === '' || $rField === '') {
+                    continue;
+                }
+                $mappings[] = [
+                    'qualtrics_field' => $qField,
+                    'redcap_field' => $rField,
+                    'value_map' => self::parseValueMap($vJson),
+                ];
             }
             if ($isAssocList) {
                 return $mappings;
@@ -361,13 +359,14 @@ class FieldMapper
                 $qField = trim((string)$q);
                 $rField = trim((string)($config['redcap_field'][$idx] ?? ''));
                 $vJson = $config['value_map_json'][$idx] ?? '';
-                if ($qField !== '' && $rField !== '') {
-                    $mappings[] = [
-                        'qualtrics_field' => $qField,
-                        'redcap_field' => $rField,
-                        'value_map' => self::parseValueMap($vJson),
-                    ];
+                if ($qField === '' || $rField === '') {
+                    continue;
                 }
+                $mappings[] = [
+                    'qualtrics_field' => $qField,
+                    'redcap_field' => $rField,
+                    'value_map' => self::parseValueMap($vJson),
+                ];
             }
         }
 
@@ -384,18 +383,20 @@ class FieldMapper
 
         if (!empty($config['static_field_defaults']) && is_array($config['static_field_defaults'])) {
             $isAssocList = false;
-            foreach ($config['static_field_defaults'] as $idx => $row) {
-                if (is_array($row) && (isset($row['field_name']) || isset($row['field_value']))) {
-                    $isAssocList = true;
-                    $fName = trim((string)($row['field_name'] ?? ''));
-                    $fVal = trim((string)($row['field_value'] ?? ''));
-                    if ($fName !== '') {
-                        $defaults[] = [
-                            'field_name' => $fName,
-                            'field_value' => $fVal,
-                        ];
-                    }
+            foreach ($config['static_field_defaults'] as $row) {
+                if (!is_array($row) || (!isset($row['field_name']) && !isset($row['field_value']))) {
+                    continue;
                 }
+                $isAssocList = true;
+                $fName = trim((string)($row['field_name'] ?? ''));
+                $fVal = trim((string)($row['field_value'] ?? ''));
+                if ($fName === '') {
+                    continue;
+                }
+                $defaults[] = [
+                    'field_name' => $fName,
+                    'field_value' => $fVal,
+                ];
             }
             if ($isAssocList) {
                 return $defaults;
@@ -407,12 +408,13 @@ class FieldMapper
             foreach ($config['field_name'] as $idx => $fn) {
                 $fName = trim((string)$fn);
                 $fVal = trim((string)($config['field_value'][$idx] ?? ''));
-                if ($fName !== '') {
-                    $defaults[] = [
-                        'field_name' => $fName,
-                        'field_value' => $fVal,
-                    ];
+                if ($fName === '') {
+                    continue;
                 }
+                $defaults[] = [
+                    'field_name' => $fName,
+                    'field_value' => $fVal,
+                ];
             }
         }
 
@@ -489,22 +491,16 @@ class FieldMapper
             }
         }
 
-        // 1. Check candidates: if candidate is a _text variant, ensure it contains non-empty text
+        // 1. Check candidates: if candidate exists in row and is non-empty, return it immediately
         foreach ($candidates as $cand) {
-            if (isset($rawLower[$cand])) {
-                $realKey = $rawLower[$cand];
-                $val = $rawRow[$realKey] ?? null;
-                if (str_ends_with($cand, '_text')) {
-                    if ($val !== null && trim((string)$val) !== '') {
-                        $matchedKey = $realKey;
-                        return $val;
-                    }
-                } else {
-                    if ($val !== null && trim((string)$val) !== '') {
-                        $matchedKey = $realKey;
-                        return $val;
-                    }
-                }
+            if (!isset($rawLower[$cand])) {
+                continue;
+            }
+            $realKey = $rawLower[$cand];
+            $val = $rawRow[$realKey] ?? null;
+            if ($val !== null && trim((string)$val) !== '') {
+                $matchedKey = $realKey;
+                return $val;
             }
         }
 

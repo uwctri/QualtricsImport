@@ -29,47 +29,36 @@
     const formatPhone = (phone) => {
         if (!phone) return '';
         const digits = String(phone).replace(/\D/g, '');
-        if (digits.length === 10) {
-            return `(${digits.substr(0,3)}) ${digits.substr(3,3)}-${digits.substr(6,4)}`;
-        }
-        return phone;
+        if (digits.length !== 10) return phone;
+        return `(${digits.substr(0, 3)}) ${digits.substr(3, 3)}-${digits.substr(6, 4)}`;
     };
 
     const formatStartDate = (dt) => {
         if (!dt) return '-';
         const cleaned = String(dt).replace('T', ' ').replace(/Z$/, '').trim();
-        if (cleaned.length >= 16) {
-            return cleaned.substring(0, 16);
-        }
-        return cleaned;
+        return cleaned.length >= 16 ? cleaned.substring(0, 16) : cleaned;
     };
 
     const getBadgeHtml = (status, category) => {
-        let badgeClass = 'badge-clean';
-        if (status === 'skipped_case_2') badgeClass = 'badge-case-2';
-        else if (status === 'rejected_case_3') badgeClass = 'badge-case-3';
-        else if (status === 'accepted_case_4') badgeClass = 'badge-case-4';
-        else if (status === 'skipped_case_1') badgeClass = 'badge-imported';
-        else if (status === 'rejected_invalid_phone' || status === 'skipped_ineligible') {
-            badgeClass = 'badge-invalid';
+        if (status === 'skipped_case_2') return `<span class="badge-status badge-case-2">${category}</span>`;
+        if (status === 'rejected_case_3') return `<span class="badge-status badge-case-3">${category}</span>`;
+        if (status === 'accepted_case_4') return `<span class="badge-status badge-case-4">${category}</span>`;
+        if (status === 'skipped_case_1') return `<span class="badge-status badge-imported">${category}</span>`;
+        if (status === 'rejected_invalid_phone' || status === 'skipped_ineligible') {
+            return `<span class="badge-status badge-invalid">${category}</span>`;
         }
-        return `<span class="badge-status ${badgeClass}">${category}</span>`;
+        return `<span class="badge-status badge-clean">${category}</span>`;
     };
 
     const updateStatusFilterSummary = () => {
         const count = selectedStatuses.size;
-        let label = 'All';
-        if (count === 0) {
-            label = 'None';
-        } else if (count === ALL_STATUS_KEYS.length) {
-            label = 'All';
-        } else if (count === 1) {
+        if (count === 0) return $('#statusFilterSummary').text('None');
+        if (count === ALL_STATUS_KEYS.length) return $('#statusFilterSummary').text('All');
+        if (count === 1) {
             const singleKey = Array.from(selectedStatuses)[0];
-            label = STATUS_LABELS[singleKey] || singleKey;
-        } else {
-            label = `${count} selected`;
+            return $('#statusFilterSummary').text(STATUS_LABELS[singleKey] || singleKey);
         }
-        $('#statusFilterSummary').text(label);
+        $('#statusFilterSummary').text(`${count} selected`);
     };
 
     const renderTable = (evaluations) => {
@@ -390,9 +379,8 @@
                 selectedStatuses.delete(val);
             }
             updateStatusFilterSummary();
-            if (currentData) {
-                renderTable(currentData.evaluations || []);
-            }
+            if (!currentData) return;
+            renderTable(currentData.evaluations || []);
         });
 
         // Status filter: Select All ("All")
@@ -400,9 +388,8 @@
             $('.status-checkbox').prop('checked', true);
             selectedStatuses = new Set(ALL_STATUS_KEYS);
             updateStatusFilterSummary();
-            if (currentData) {
-                renderTable(currentData.evaluations || []);
-            }
+            if (!currentData) return;
+            renderTable(currentData.evaluations || []);
         });
 
         // Status filter: Clear All ("Clear")
@@ -410,22 +397,16 @@
             $('.status-checkbox').prop('checked', false);
             selectedStatuses.clear();
             updateStatusFilterSummary();
-            if (currentData) {
-                renderTable(currentData.evaluations || []);
-            }
+            if (!currentData) return;
+            renderTable(currentData.evaluations || []);
         });
 
         // Search input handler
         $('#previewSearch').on('input', function () {
             searchTerm = $(this).val().trim();
-            if (searchTerm) {
-                $('#previewSearchClearContainer').show();
-            } else {
-                $('#previewSearchClearContainer').hide();
-            }
-            if (currentData) {
-                renderTable(currentData.evaluations || []);
-            }
+            $('#previewSearchClearContainer').toggle(Boolean(searchTerm));
+            if (!currentData) return;
+            renderTable(currentData.evaluations || []);
         });
 
         // Clear search input
@@ -433,10 +414,9 @@
             $('#previewSearch').val('');
             searchTerm = '';
             $('#previewSearchClearContainer').hide();
-            if (currentData) {
-                renderTable(currentData.evaluations || []);
-            }
             $('#previewSearch').focus();
+            if (!currentData) return;
+            renderTable(currentData.evaluations || []);
         });
 
         // Column header sort handler
@@ -510,12 +490,12 @@
         });
 
         // Initial preview load if survey is configured
-        if (module.hasSurveyId) {
-            loadPreview();
-        } else {
+        if (!module.hasSurveyId) {
             $('#previewLoading').hide();
             $('#previewContent').show();
             renderTable([]);
+            return;
         }
+        loadPreview();
     });
 })();

@@ -108,6 +108,34 @@
             }
         },
         {
+            "key": "permissions_header",
+            "name": "<strong>Access Permissions</strong>",
+            "type": "descriptive"
+        },
+        {
+            "key": "link_display_permission",
+            "name": "Who can access and run manual imports from the project menu?",
+            "type": "dropdown",
+            "choices": [
+                { "value": "all", "name": "All project users (Default)" },
+                { "value": "data_import_tool", "name": "Users with Data Import Tool rights (or Design rights)" },
+                { "value": "record_create", "name": "Users with Record Create rights (or Design rights)" },
+                { "value": "design", "name": "Users with Project Design and Setup rights only" },
+                { "value": "custom_users", "name": "Specific selected users only" }
+            ],
+            "default": "all"
+        },
+        {
+            "key": "allowed_users",
+            "name": "Authorized Users",
+            "type": "user-list",
+            "repeatable": true,
+            "branchingLogic": {
+                "field": "link_display_permission",
+                "value": "custom_users"
+            }
+        },
+        {
             "key": "target_header",
             "name": "<strong>REDCap Target & Identifier Strategy</strong>",
             "type": "descriptive"
