@@ -516,6 +516,13 @@ class QualtricsImport extends AbstractExternalModule
             ];
         }
 
+        $surveyTagMap = [];
+        try {
+            $surveyTagMap = $client->getSurveyQuestionTags($surveyId);
+        } catch (\Throwable) {
+            $surveyTagMap = [];
+        }
+
         $results = [
             'is_dry_run' => $isDryRun,
             'start_date_used' => $startDate,
@@ -530,8 +537,9 @@ class QualtricsImport extends AbstractExternalModule
             'diagnostics' => [
                 'parsed_custom_mappings' => FieldMapper::parseCustomMappings($config),
                 'parsed_static_defaults' => FieldMapper::parseStaticDefaults($config),
+                'tag_map' => $surveyTagMap,
                 'qualtrics_fields' => !empty($rawSurveyRows) ? array_keys($rawSurveyRows[0]) : [],
-                'sample_raw_values' => !empty($rawSurveyRows) ? array_slice($rawSurveyRows[0], 0, 25) : [],
+                'sample_raw_values' => !empty($rawSurveyRows) ? array_slice($rawSurveyRows[0], 0, 100) : [],
             ],
         ];
 

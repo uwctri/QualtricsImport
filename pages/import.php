@@ -195,7 +195,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
 
 <!-- Diagnostics Modal -->
 <div class="modal fade" id="diagnosticsModal" tabindex="-1" role="dialog" aria-labelledby="diagnosticsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog modal-xl" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="diagnosticsModalLabel"><i class="fas fa-stethoscope text-info"></i> Survey & Mapping Diagnostics</h5>
@@ -225,11 +225,14 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                 </div>
 
                 <h6><i class="fas fa-tags text-success"></i> Fields Received in Qualtrics Export</h6>
-                <div id="diagFieldsContainer" class="p-2 border rounded bg-light mb-3" style="max-height: 120px; overflow-y: auto;">
+                <div id="diagFieldsContainer" class="p-2 border rounded bg-light mb-3" style="max-height: 140px; overflow-y: auto;">
                 </div>
 
-                <h6><i class="fas fa-file-code text-muted"></i> Sample Survey Response (First Record)</h6>
-                <pre id="diagSampleJson" class="bg-dark text-light p-2 rounded" style="max-height: 180px; overflow-y: auto; font-size: 11px;"></pre>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h6 class="mb-0"><i class="fas fa-file-code text-muted"></i> Sample Survey Response (First Record)</h6>
+                    <small class="text-muted"><i class="fas fa-info-circle text-info"></i> Aliased lines annotated with right-aligned comments</small>
+                </div>
+                <pre id="diagSampleJson" class="bg-dark text-light p-3 rounded" style="max-height: 320px; overflow-x: auto; overflow-y: auto; font-size: 11px; line-height: 1.5; white-space: pre; font-family: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"></pre>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
