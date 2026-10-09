@@ -33,7 +33,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
             <div class="text-muted small">
                 <span class="mr-3"><strong>Survey:</strong> <code><?= htmlspecialchars($surveyId ?: 'Not Configured') ?></code></span>
                 <span class="mr-3"><strong>Mode:</strong> <?= htmlspecialchars($mappingMode === 'whitelist' ? 'Whitelist Only' : 'Auto-Map') ?></span>
-                <span><strong>Last Sync:</strong> <?= htmlspecialchars($lastSync ?: 'None') ?></span>
+                <span><strong>Last Sync:</strong> <span id="lastSyncDisplay"><?= htmlspecialchars($lastSync ?: 'None') ?></span></span>
             </div>
         </div>
     </div>
@@ -47,7 +47,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                     <option value="auto" selected>Auto (Past 24h or Last Import)</option>
                     <option value="past_24h">Past 24 Hours</option>
                     <?php if (!empty($lastSync)): ?>
-                    <option value="last_sync">Since Last Import (<?= htmlspecialchars($lastSync) ?>)</option>
+                    <option value="last_sync" data-last-sync="<?= htmlspecialchars($lastSync) ?>">Since Last Import (<?= htmlspecialchars($lastSync) ?>)</option>
                     <?php endif; ?>
                     <option value="past_7d">Past 7 Days</option>
                     <option value="past_30d">Past 30 Days</option>

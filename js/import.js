@@ -35,8 +35,34 @@
 
     const formatStartDate = (dt) => {
         if (!dt) return '-';
-        const cleaned = String(dt).replace('T', ' ').replace(/Z$/, '').trim();
-        return cleaned.length >= 16 ? cleaned.substring(0, 16) : cleaned;
+        const str = String(dt).trim();
+        if (!str || str === 'None') return '-';
+
+        // If date-only format (YYYY-MM-DD), return as-is without shifting
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            return str;
+        }
+
+        // Qualtrics timestamps are UTC. If no timezone offset is attached, treat as UTC ('Z')
+        let isoStr = str.replace(' ', 'T');
+        if (!isoStr.endsWith('Z') && !/[+-]\d{2}(:\d{2})?$/.test(isoStr)) {
+            isoStr += 'Z';
+        }
+
+        const date = new Date(isoStr);
+        if (isNaN(date.getTime())) {
+            const cleaned = str.replace('T', ' ').replace(/Z$/, '').trim();
+            return cleaned.length >= 16 ? cleaned.substring(0, 16) : cleaned;
+        }
+
+        const pad = (n) => String(n).padStart(2, '0');
+        const year = date.getFullYear();
+        const month = pad(date.getMonth() + 1);
+        const day = pad(date.getDate());
+        const hours = pad(date.getHours());
+        const minutes = pad(date.getMinutes());
+
+        return `${year}-${month}-${day} ${hours}:${minutes}`;
     };
 
     const getBadgeHtml = (status, category) => {
@@ -107,6 +133,7 @@
                     item.category || '',
                     item.status || '',
                     item.start_date || '',
+                    formatStartDate(item.start_date),
                     item.candidate_name || '',
                     item.candidate_phone || '',
                     item.qualtrics_id || '',
@@ -126,9 +153,12 @@
                     case 'status':
                         comp = (a.category || '').localeCompare(b.category || '', undefined, { sensitivity: 'base' });
                         break;
-                    case 'start_date':
-                        comp = (a.start_date || '').localeCompare(b.start_date || '');
+                    case 'start_date': {
+                        const tA = a.start_date ? new Date(String(a.start_date).replace(' ', 'T')).getTime() || 0 : 0;
+                        const tB = b.start_date ? new Date(String(b.start_date).replace(' ', 'T')).getTime() || 0 : 0;
+                        comp = tA - tB;
                         break;
+                    }
                     case 'name':
                         comp = (a.candidate_name || '').localeCompare(b.candidate_name || '', undefined, { sensitivity: 'base' });
                         break;
@@ -202,11 +232,13 @@
 
         filtered.forEach(row => {
             const allocatedId = row.record_id ? `<strong>${row.record_id}</strong>` : '<span class="text-muted">-</span>';
+            const formattedDate = formatStartDate(row.start_date);
+            const dateTitle = (row.start_date && formattedDate !== '-') ? ` title="Qualtrics UTC: ${String(row.start_date).replace(/"/g, '&quot;')}"` : '';
 
             const tr = `
                 <tr>
                     <td>${getBadgeHtml(row.status, row.category)}</td>
-                    <td class="text-nowrap"><small>${formatStartDate(row.start_date)}</small></td>
+                    <td class="text-nowrap"${dateTitle}><small>${formattedDate}</small></td>
                     <td><strong>${row.candidate_name || '-'}</strong></td>
                     <td class="text-nowrap">${formatPhone(row.candidate_phone)}</td>
                     <td><small class="text-muted">${row.qualtrics_id}</small></td>
@@ -338,6 +370,32 @@
     };
 
     $(document).ready(() => {
+        // Format last sync timestamp headers/options in local browser time
+        const formatLastSyncDisplays = () => {
+            const $lastSyncHeader = $('#lastSyncDisplay');
+            if ($lastSyncHeader.length) {
+                const raw = $lastSyncHeader.text().trim();
+                if (raw && raw !== 'None') {
+                    const formatted = formatStartDate(raw);
+                    if (formatted !== '-') {
+                        $lastSyncHeader.text(formatted).attr('title', `Qualtrics UTC: ${raw}`);
+                    }
+                }
+            }
+
+            const $lastSyncOpt = $('option[value="last_sync"]');
+            if ($lastSyncOpt.length) {
+                const raw = $lastSyncOpt.attr('data-last-sync');
+                if (raw) {
+                    const formatted = formatStartDate(raw);
+                    if (formatted !== '-') {
+                        $lastSyncOpt.text(`Since Last Import (${formatted})`);
+                    }
+                }
+            }
+        };
+        formatLastSyncDisplays();
+
         // Restore remembered limit if present
         try {
             const savedLimit = localStorage.getItem('qualtrics_import_preview_limit');
