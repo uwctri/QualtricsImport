@@ -251,6 +251,17 @@ class QualtricsImport extends AbstractExternalModule
             'timestamp' => date('Y-m-d H:i:s'),
         ];
 
+        if (!empty($config['target_event'])) {
+            $targetEvent = (string)$config['target_event'];
+            $uniqueEventNames = (new \Project($projectId))->getUniqueEventNames();
+            if (isset($uniqueEventNames[$targetEvent])) {
+                $config['target_event'] = $uniqueEventNames[$targetEvent];
+            } elseif (!in_array($targetEvent, $uniqueEventNames, true)) {
+                $emptyResponse['message'] = 'The configured Target Event is invalid. Please select a valid event in the module settings.';
+                return $emptyResponse;
+            }
+        }
+
         if ($surveyId === '') {
             $emptyResponse['message'] = 'Qualtrics Survey ID is not configured.';
             return $emptyResponse;
