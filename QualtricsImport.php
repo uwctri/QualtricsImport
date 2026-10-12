@@ -558,7 +558,7 @@ class QualtricsImport extends AbstractExternalModule
             'project_id' => $projectId,
             'imported_count' => $results['imported_count'],
             'notes_updated_count' => $results['notes_updated_count'],
-            'errors' => $results['commit_results']['errors'],
+            'errors' => json_encode($results['commit_results']['errors']),
             'counts' => json_encode($results['counts']),
         ]);
 
