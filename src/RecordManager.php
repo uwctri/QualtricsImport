@@ -111,18 +111,16 @@ class RecordManager
             $noteSaveRes = REDCap::saveData($projectId, 'json', json_encode(array_values($noteUpdates)));
             if (!empty($noteSaveRes['errors'])) {
                 $results['errors'][] = "Notes error: " . json_encode($noteSaveRes['errors']);
-            } else {
-                $results['notes_updated_count'] = count($noteUpdates);
             }
+            $results['notes_updated_count'] = count($noteSaveRes['ids'] ?? []);
         }
 
         if (!empty($newRecords)) {
             $importSaveRes = REDCap::saveData($projectId, 'json', json_encode(array_values($newRecords)));
             if (!empty($importSaveRes['errors'])) {
                 $results['errors'][] = "Import error: " . json_encode($importSaveRes['errors']);
-            } else {
-                $results['imported_count'] = count($newRecords);
             }
+            $results['imported_count'] = count($importSaveRes['ids'] ?? []);
         }
 
         return $results;

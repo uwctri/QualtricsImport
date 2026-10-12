@@ -267,16 +267,15 @@
         return { limit, sinceType };
     };
 
-    const showStatusAlert = (message, type = 'info') => {
-        const alertHtml = `
-            <div class="alert alert-${type} alert-dismissible fade show mb-3" role="alert">
-                ${message}
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-        `;
-        $('#importAlertArea').html(alertHtml);
+    const showStatusAlert = (title, message, icon = 'info') => {
+        return Swal.fire({
+            title,
+            text: message,
+            icon,
+            timer: 6000,
+            timerProgressBar: true,
+            showConfirmButton: false
+        });
     };
 
     const loadPreview = () => {
@@ -334,8 +333,17 @@
             });
     };
 
-    const runLiveImport = () => {
-        if (!confirm('Are you sure you want to run the live import now? This will create new REDCap records and update existing notes.')) {
+    const runLiveImport = async () => {
+        const confirmation = await Swal.fire({
+            title: 'Run live import?',
+            text: 'This will create new REDCap records and update existing notes.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Import now',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true
+        });
+        if (!confirmation.isConfirmed) {
             return;
         }
 
@@ -351,21 +359,43 @@
                 $('#btnRefresh').prop('disabled', false);
 
                 if (!res || !res.success) {
-                    showStatusAlert('Import failed: ' + (res && res.message ? res.message : 'Unknown error'), 'danger');
+                    $('#btnRunImport').prop('disabled', false);
+                    showStatusAlert('Import failed', (res && res.message) || 'Unknown error', 'error');
                     return;
                 }
 
                 const d = res.data;
-                const imported = d.ready_to_import_count || 0;
-                const notes = d.note_updates_count || 0;
+                if (d.message) {
+                    $('#btnRunImport').prop('disabled', false);
+                    showStatusAlert('Import failed', d.message, 'error');
+                    return;
+                }
 
-                showStatusAlert(`<strong>Import completed successfully!</strong> ${imported} record(s) imported, ${notes} note(s) updated.`, 'success');
+                const commitResults = d.commit_results;
+                if (!commitResults || !Array.isArray(commitResults.errors)) {
+                    $('#btnRunImport').prop('disabled', false);
+                    showStatusAlert('Unable to verify import', 'REDCap did not return import results. Refresh the preview and check the project data before retrying.', 'error');
+                    return;
+                }
+
+                const imported = commitResults.imported_count || 0;
+                const notes = commitResults.notes_updated_count || 0;
+                const errors = commitResults.errors;
+                const hasErrors = errors.length > 0;
+                const title = hasErrors
+                    ? (imported || notes ? 'Import partially completed' : 'Import failed')
+                    : 'Import completed';
+                const message = `${imported} record(s) imported, ${notes} note(s) updated.`
+                    + (hasErrors ? ` Errors: ${errors.join('; ')}` : '');
+
+                $('#btnRunImport').prop('disabled', false);
+                showStatusAlert(title, message, hasErrors ? 'warning' : 'success');
                 loadPreview();
             })
             .catch(err => {
                 $('#btnRunImport').prop('disabled', false).html('<i class="fas fa-play"></i> Run Import Now');
                 $('#btnRefresh').prop('disabled', false);
-                showStatusAlert('AJAX error during import execution: ' + err, 'danger');
+                showStatusAlert('Import failed', `AJAX error during import execution: ${err.message || err}`, 'error');
             });
     };
 

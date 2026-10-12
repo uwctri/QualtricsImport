@@ -549,11 +549,16 @@ class QualtricsImport extends AbstractExternalModule
         }
 
         $results['commit_results'] = RecordManager::commitImports($projectId, $newRecordsToSave, $noteUpdatesToSave);
-        $this->setProjectSetting('last_successful_sync_time', gmdate('Y-m-d\TH:i:s\Z'), $projectId);
+        $results['imported_count'] = $results['commit_results']['imported_count'];
+        $results['notes_updated_count'] = $results['commit_results']['notes_updated_count'];
+        if (empty($results['commit_results']['errors'])) {
+            $this->setProjectSetting('last_successful_sync_time', gmdate('Y-m-d\TH:i:s\Z'), $projectId);
+        }
         $this->log("Qualtrics Import completed for project {$projectId}", [
             'project_id' => $projectId,
-            'imported_count' => count($newRecordsToSave),
-            'notes_updated_count' => count($noteUpdatesToSave),
+            'imported_count' => $results['imported_count'],
+            'notes_updated_count' => $results['notes_updated_count'],
+            'errors' => $results['commit_results']['errors'],
             'counts' => json_encode($results['counts']),
         ]);
 
