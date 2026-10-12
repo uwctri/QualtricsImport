@@ -4,6 +4,8 @@
 
     let currentData = null;
     const manuallyExcludedResponseIds = new Set();
+    let manualExclusionsLoaded = false;
+    let manualExclusionSaveInProgress = false;
     const STATUS_MAP = {
         'ready': ['accepted_clean'],
         'do_not_import': ['skipped_manual'],
@@ -243,7 +245,7 @@
                 ? $('<div>').text(String(row.qualtrics_id)).html().replace(/"/g, '&quot;')
                 : '';
             const actionButton = canToggleImport && row.qualtrics_id
-                ? `<button type="button" class="btn btn-sm ${row.status === 'skipped_manual' ? 'btn-outline-success' : 'btn-outline-danger'} toggle-import-exclusion" data-qualtrics-id="${qualtricsIdAttribute}" title="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" aria-label="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}"><i class="fas ${row.status === 'skipped_manual' ? 'fa-undo' : 'fa-times'}"></i></button>`
+                ? `<button type="button" class="btn btn-sm ${row.status === 'skipped_manual' ? 'btn-outline-success' : 'btn-outline-danger'} toggle-import-exclusion" data-qualtrics-id="${qualtricsIdAttribute}" title="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" aria-label="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" ${manualExclusionSaveInProgress ? 'disabled' : ''}><i class="fas ${row.status === 'skipped_manual' ? 'fa-undo' : 'fa-times'}"></i></button>`
                 : '';
 
             const tr = `
@@ -260,6 +262,27 @@
             `;
             $tbody.append(tr);
         });
+    };
+
+    const setManualExclusionOnRow = (row, excluded) => {
+        if (excluded) {
+            row.unexcludedStatus = row.status;
+            row.unexcludedCategory = row.category;
+            row.unexcludedDescription = row.description;
+            row.status = 'skipped_manual';
+            row.category = 'Do Not Import';
+            row.description = 'Flagged by user; excluded from import.';
+        } else {
+            row.status = row.unexcludedStatus || row.unexcluded_status || 'accepted_clean';
+            row.category = row.unexcludedCategory || row.unexcluded_category || 'Clean New Record';
+            row.description = row.unexcludedDescription || row.unexcluded_description || '';
+            delete row.unexcludedStatus;
+            delete row.unexcludedCategory;
+            delete row.unexcludedDescription;
+            delete row.unexcluded_status;
+            delete row.unexcluded_category;
+            delete row.unexcluded_description;
+        }
     };
 
     const updateCounts = (counts, total, evaluations) => {
@@ -294,6 +317,8 @@
     };
 
     const loadPreview = () => {
+        if (!manualExclusionsLoaded) return;
+
         if (!module.hasSurveyId) {
             $('#previewLoading').hide();
             $('#previewContent').show();
@@ -320,7 +345,11 @@
 
                 currentData = res.data;
                 (currentData.evaluations || []).forEach(item => {
-                    if (
+                    if (item.status === 'skipped_manual') {
+                        item.unexcludedStatus = item.unexcluded_status;
+                        item.unexcludedCategory = item.unexcluded_category;
+                        item.unexcludedDescription = item.unexcluded_description;
+                    } else if (
                         manuallyExcludedResponseIds.has(String(item.qualtrics_id))
                         && ['accepted_clean', 'accepted_case_4'].includes(item.status)
                     ) {
@@ -379,10 +408,7 @@
         $('#btnRefresh').prop('disabled', true);
         $('#importAlertArea').empty();
 
-        const params = {
-            ...getPreviewParams(),
-            excludeResponseIds: Array.from(manuallyExcludedResponseIds)
-        };
+        const params = getPreviewParams();
 
         module.ajax('runImport', params)
             .then(res => {
@@ -477,34 +503,47 @@
         });
 
         $(document).on('click', '.toggle-import-exclusion', function() {
-            if (!currentData) return;
+            if (!currentData || manualExclusionSaveInProgress) return;
 
             const qualtricsId = String($(this).attr('data-qualtrics-id') || '');
             const row = (currentData.evaluations || []).find(item => String(item.qualtrics_id) === qualtricsId);
             if (!row || !qualtricsId) return;
 
-            if (row.status === 'skipped_manual') {
-                manuallyExcludedResponseIds.delete(qualtricsId);
-                row.status = row.unexcludedStatus || 'accepted_clean';
-                row.category = row.unexcludedCategory || 'Clean New Record';
-                row.description = row.unexcludedDescription || '';
-                delete row.unexcludedStatus;
-                delete row.unexcludedCategory;
-                delete row.unexcludedDescription;
-            } else if (row.status === 'accepted_clean') {
-                manuallyExcludedResponseIds.add(qualtricsId);
-                row.unexcludedStatus = row.status;
-                row.unexcludedCategory = row.category;
-                row.unexcludedDescription = row.description;
-                row.status = 'skipped_manual';
-                row.category = 'Do Not Import';
-                row.description = 'Flagged by user; excluded from import.';
+            const shouldExclude = row.status !== 'skipped_manual';
+            const updatedResponseIds = new Set(manuallyExcludedResponseIds);
+            if (shouldExclude) {
+                updatedResponseIds.add(qualtricsId);
+            } else {
+                updatedResponseIds.delete(qualtricsId);
             }
 
+            manualExclusionSaveInProgress = true;
+            $('#btnRunImport').prop('disabled', true);
+            $('.toggle-import-exclusion').prop('disabled', true);
+            setManualExclusionOnRow(row, shouldExclude);
             updateCounts(currentData.counts || {}, currentData.evaluations.length, currentData.evaluations);
             renderTable(currentData.evaluations);
-            const readyCount = currentData.evaluations.filter(item => ['accepted_clean', 'accepted_case_4'].includes(item.status)).length;
-            $('#btnRunImport').prop('disabled', readyCount === 0 && !currentData.note_updates_count);
+
+            module.ajax('saveManualExclusions', { responseIds: Array.from(updatedResponseIds) })
+                .then(res => {
+                    if (!res || !res.success || !Array.isArray(res.responseIds)) {
+                        throw new Error('REDCap did not confirm that the exclusion was saved.');
+                    }
+
+                    manuallyExcludedResponseIds.clear();
+                    res.responseIds.forEach(id => manuallyExcludedResponseIds.add(String(id)));
+                })
+                .catch(err => {
+                    setManualExclusionOnRow(row, !shouldExclude);
+                    showStatusAlert('Unable to save exclusion', err.message || String(err), 'error');
+                })
+                .finally(() => {
+                    manualExclusionSaveInProgress = false;
+                    updateCounts(currentData.counts || {}, currentData.evaluations.length, currentData.evaluations);
+                    renderTable(currentData.evaluations);
+                    const readyCount = currentData.evaluations.filter(item => ['accepted_clean', 'accepted_case_4'].includes(item.status)).length;
+                    $('#btnRunImport').prop('disabled', readyCount === 0 && !currentData.note_updates_count);
+                });
         });
 
         $('#previewSince').on('change', () => {
@@ -818,13 +857,29 @@
             $('#diagnosticsModal').modal('show');
         });
 
-        // Initial preview load if survey is configured
+        // Load project-level exclusions before showing a preview or enabling imports.
         if (!module.hasSurveyId) {
+            manualExclusionsLoaded = true;
             $('#previewLoading').hide();
             $('#previewContent').show();
             renderTable([]);
             return;
         }
-        loadPreview();
+
+        module.ajax('getManualExclusions', {})
+            .then(res => {
+                if (!res || !res.success || !Array.isArray(res.responseIds)) {
+                    throw new Error('REDCap did not return the saved manual exclusions.');
+                }
+
+                res.responseIds.forEach(id => manuallyExcludedResponseIds.add(String(id)));
+                manualExclusionsLoaded = true;
+                loadPreview();
+            })
+            .catch(err => {
+                $('#previewLoading').hide();
+                $('#btnRunImport').prop('disabled', true);
+                showStatusAlert('Unable to load saved exclusions', err.message || String(err), 'error');
+            });
     });
 })();

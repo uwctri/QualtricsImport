@@ -24,7 +24,9 @@
         "getSurveys",
         "testConnection",
         "previewImport",
-        "runImport"
+        "runImport",
+        "getManualExclusions",
+        "saveManualExclusions"
     ],
     "crons": [
         {
@@ -86,6 +88,12 @@
             "name": "Qualtrics Survey ID (e.g., SV_8CfudJDsw3LwsyG)",
             "type": "text",
             "required": true
+        },
+        {
+            "key": "manual-excluded-response-ids",
+            "name": "Manually excluded Qualtrics Response IDs",
+            "type": "text",
+            "hidden": true
         },
         {
             "key": "import_enabled",

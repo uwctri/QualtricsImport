@@ -5,7 +5,7 @@ A REDCap External Module to import survey screening responses from Qualtrics wit
 ## Features
 - **Automatic Sanitization**: Detects and standardizes dates (`YYYY-MM-DD`) and phone numbers (10-digit NANP) without manual mapping rules.
 - **Smart Deduplication**: Identifies repeat submissions, shared household phones, and fuzzy name matches.
-- **Dry-Run Preview**: Inspect pending responses, match decisions, and similarity scores from the project link before importing.
+- **Dry-Run Preview**: Inspect pending responses, match decisions, and similarity scores from the project link before importing. Clean new records can be flagged as do not import; these exclusions persist across page refreshes and are enforced for project imports.
 - **Scheduled Sync**: Automated background sync via REDCap cron.
 
 ## Setup

@@ -132,20 +132,17 @@ class QualtricsImport extends AbstractExternalModule
         $limit = isset($payload['limit']) ? max(1, min(10000, (int)$payload['limit'])) : 1000;
         $sinceType = (string)($payload['sinceType'] ?? 'auto');
         $customStartDate = !empty($payload['startDate']) ? (string)$payload['startDate'] : null;
-        $excludedResponseIds = $payload['excludeResponseIds'] ?? [];
-        if (!is_array($excludedResponseIds)) {
-            $excludedResponseIds = [];
-        }
-        $excludedResponseIds = array_slice(array_values(array_unique(array_map(
-            static fn($id): string => (string)$id,
-            array_filter($excludedResponseIds, static fn($id): bool => is_scalar($id) && (string)$id !== '')
-        ))), 0, 10000);
 
         return match ($action) {
             'testConnection' => $this->getQualtricsClient($project_id)->testConnection(),
             'getSurveys' => ['success' => true, 'surveys' => $this->getQualtricsClient($project_id)->getSurveys()],
+            'getManualExclusions' => ['success' => true, 'responseIds' => $this->getManuallyExcludedResponseIds((int)$project_id)],
+            'saveManualExclusions' => [
+                'success' => true,
+                'responseIds' => $this->saveManuallyExcludedResponseIds((int)$project_id, $payload['responseIds'] ?? null),
+            ],
             'previewImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, true, false, $limit, $sinceType, $customStartDate)],
-            'runImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, false, false, $limit, $sinceType, $customStartDate, $excludedResponseIds)],
+            'runImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, false, false, $limit, $sinceType, $customStartDate)],
         };
     }
 
@@ -219,10 +216,11 @@ class QualtricsImport extends AbstractExternalModule
         ?int $limit = 1000,
         ?string $sinceType = 'auto',
         ?string $customStartDate = null,
-        array $excludedResponseIds = []
+        ?array $excludedResponseIds = null
     ): array {
         $today = date('Y-m-d');
         $config = $this->getProjectSettings($projectId);
+        $excludedResponseIds ??= $this->getManuallyExcludedResponseIds($projectId);
         try {
             if (method_exists($this, 'getSubSettings')) {
                 $subMappings = $this->getSubSettings('custom_value_mappings', $projectId);
@@ -377,6 +375,35 @@ class QualtricsImport extends AbstractExternalModule
                 continue;
             }
 
+            if (in_array($respId, $excludedResponseIds, true)) {
+                $previewInfo = FieldMapper::extractCandidatePreviewInfo($rawRow, $config);
+                $evaluations[] = [
+                    'category' => 'Do Not Import',
+                    'status' => 'skipped_manual',
+                    'description' => 'Flagged by user; excluded from import.',
+                    'qualtrics_id' => $respId,
+                    'start_date' => $startDate,
+                    'candidate_name' => $previewInfo['name'],
+                    'candidate_phone' => $previewInfo['phone'],
+                    'record_id' => null,
+                    'unexcluded_status' => 'accepted_clean',
+                    'unexcluded_category' => 'Clean New Record',
+                    'unexcluded_description' => 'No duplicate conflicts detected',
+                    'scores' => null,
+                ];
+                $categoryCounts['user_excluded']++;
+
+                if (!$isDryRun) {
+                    $this->log("Qualtrics Import: Response excluded by user", [
+                        'project_id' => $projectId,
+                        'qualtrics_id' => $respId,
+                        'candidate_name' => $previewInfo['name'],
+                        'status' => 'skipped_manual',
+                    ]);
+                }
+                continue;
+            }
+
             $exclusionReason = null;
             $mapped = FieldMapper::mapRecord($rawRow, $config, $fieldNames, $dict, $projectId, $exclusionReason);
             if ($mapped === null) {
@@ -491,27 +518,6 @@ class QualtricsImport extends AbstractExternalModule
                 continue;
             }
 
-            if (
-                in_array($eval['status'], ['accepted_clean', 'accepted_case_4'], true)
-                && in_array($mapped['qualtrics_id'], $excludedResponseIds, true)
-            ) {
-                $evalSummary['category'] = 'Do Not Import';
-                $evalSummary['status'] = 'skipped_manual';
-                $evalSummary['description'] = 'Flagged by user; excluded from import.';
-                $evaluations[] = $evalSummary;
-                $categoryCounts['user_excluded']++;
-
-                if (!$isDryRun) {
-                    $this->log("Qualtrics Import: Response excluded by user", [
-                        'project_id' => $projectId,
-                        'qualtrics_id' => $mapped['qualtrics_id'],
-                        'candidate_name' => $mapped['display_name'],
-                        'status' => 'skipped_manual',
-                    ]);
-                }
-                continue;
-            }
-
             // Candidate accepted
             $allocatedId = RecordManager::getNextRecordId(
                 $projectId,
@@ -606,6 +612,59 @@ class QualtricsImport extends AbstractExternalModule
         ]);
 
         return $results;
+    }
+
+    /**
+     * Get project-level Qualtrics ResponseIds manually excluded from imports.
+     */
+    private function getManuallyExcludedResponseIds(int $projectId): array
+    {
+        $stored = $this->getProjectSetting('manual-excluded-response-ids', $projectId);
+        if (empty($stored)) {
+            return [];
+        }
+
+        $responseIds = is_array($stored) ? $stored : json_decode((string)$stored, true);
+        if (!is_array($responseIds)) {
+            throw new Exception('Saved manual import exclusions are invalid. Clear or repair the module setting before importing.');
+        }
+
+        return $this->normalizeManualExclusionIds($responseIds);
+    }
+
+    /**
+     * Persist project-level Qualtrics ResponseIds manually excluded from imports.
+     */
+    private function saveManuallyExcludedResponseIds(int $projectId, $responseIds): array
+    {
+        if (!is_array($responseIds)) {
+            throw new Exception('The manual exclusion list must be an array of Qualtrics ResponseIds.');
+        }
+
+        $responseIds = $this->normalizeManualExclusionIds($responseIds);
+        if (count($responseIds) > 10000) {
+            throw new Exception('The manual exclusion list cannot contain more than 10,000 ResponseIds.');
+        }
+
+        $this->setProjectSetting('manual-excluded-response-ids', json_encode($responseIds), $projectId);
+        return $responseIds;
+    }
+
+    private function normalizeManualExclusionIds(array $responseIds): array
+    {
+        $normalized = [];
+        foreach ($responseIds as $responseId) {
+            if (!is_scalar($responseId)) {
+                throw new Exception('The manual exclusion list contains an invalid ResponseId.');
+            }
+
+            $responseId = trim((string)$responseId);
+            if ($responseId !== '') {
+                $normalized[$responseId] = $responseId;
+            }
+        }
+
+        return array_values($normalized);
     }
 
     /**
