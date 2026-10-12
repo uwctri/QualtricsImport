@@ -3,8 +3,10 @@
     if (!module) return;
 
     let currentData = null;
+    const manuallyExcludedResponseIds = new Set();
     const STATUS_MAP = {
         'ready': ['accepted_clean'],
+        'do_not_import': ['skipped_manual'],
         'imported': ['skipped_case_1'],
         'case_4': ['accepted_case_4'],
         'case_2': ['skipped_case_2'],
@@ -13,6 +15,7 @@
     };
     const STATUS_LABELS = {
         'ready': 'Ready',
+        'do_not_import': 'Do Not Import',
         'imported': 'Imported',
         'case_4': 'Possible Dups',
         'case_2': 'Duplicates',
@@ -66,6 +69,7 @@
     };
 
     const getBadgeHtml = (status, category) => {
+        if (status === 'skipped_manual') return `<span class="badge-status badge-manual-exclusion">${category}</span>`;
         if (status === 'skipped_case_2') return `<span class="badge-status badge-case-2">${category}</span>`;
         if (status === 'rejected_case_3') return `<span class="badge-status badge-case-3">${category}</span>`;
         if (status === 'accepted_case_4') return `<span class="badge-status badge-case-4">${category}</span>`;
@@ -94,7 +98,7 @@
         if (!evaluations || evaluations.length === 0) {
             $tbody.html(`
                 <tr>
-                    <td colspan="7" class="p-0 border-0">
+                    <td colspan="8" class="p-0 border-0">
                         <div class="empty-preview-state text-center">
                             <div class="empty-icon-wrapper mb-3">
                                 <i class="fas fa-inbox fa-3x text-muted" style="opacity: 0.35;"></i>
@@ -214,7 +218,7 @@
 
             $tbody.html(`
                 <tr>
-                    <td colspan="7" class="p-0 border-0">
+                    <td colspan="8" class="p-0 border-0">
                         <div class="empty-preview-state text-center">
                             <div class="empty-icon-wrapper mb-3">
                                 <i class="fas ${emptyIcon} fa-3x text-muted" style="opacity: 0.35;"></i>
@@ -234,6 +238,13 @@
             const allocatedId = row.record_id ? `<strong>${row.record_id}</strong>` : '<span class="text-muted">-</span>';
             const formattedDate = formatStartDate(row.start_date);
             const dateTitle = (row.start_date && formattedDate !== '-') ? ` title="Qualtrics UTC: ${String(row.start_date).replace(/"/g, '&quot;')}"` : '';
+            const canToggleImport = row.status === 'accepted_clean' || row.status === 'skipped_manual';
+            const qualtricsIdAttribute = row.qualtrics_id
+                ? $('<div>').text(String(row.qualtrics_id)).html().replace(/"/g, '&quot;')
+                : '';
+            const actionButton = canToggleImport && row.qualtrics_id
+                ? `<button type="button" class="btn btn-sm ${row.status === 'skipped_manual' ? 'btn-outline-success' : 'btn-outline-danger'} toggle-import-exclusion" data-qualtrics-id="${qualtricsIdAttribute}" title="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" aria-label="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}"><i class="fas ${row.status === 'skipped_manual' ? 'fa-undo' : 'fa-times'}"></i></button>`
+                : '';
 
             const tr = `
                 <tr>
@@ -244,17 +255,21 @@
                     <td><small class="text-muted">${row.qualtrics_id}</small></td>
                     <td>${allocatedId}</td>
                     <td><small>${row.description}</small></td>
+                    <td>${actionButton}</td>
                 </tr>
             `;
             $tbody.append(tr);
         });
     };
 
-    const updateCounts = (counts, total) => {
+    const updateCounts = (counts, total, evaluations) => {
+        const visibleEvaluations = evaluations || [];
+        const readyCount = visibleEvaluations.filter(item => ['accepted_clean', 'accepted_case_4'].includes(item.status)).length;
         $('#cntTotalBadge').text(`${(total || 0).toLocaleString()} total`);
-        $('#cntReady').text((counts.clean_new || 0).toLocaleString());
+        $('#cntReady').text(readyCount.toLocaleString());
+        $('#cntDoNotImport').text(visibleEvaluations.filter(item => item.status === 'skipped_manual').length.toLocaleString());
         $('#cntImported').text((counts.case_1_existing_id || 0).toLocaleString());
-        $('#cntCase4').text((counts.case_4_suspected || 0).toLocaleString());
+        $('#cntCase4').text(visibleEvaluations.filter(item => item.status === 'accepted_case_4').length.toLocaleString());
         $('#cntCase2').text((counts.case_2_duplicate || 0).toLocaleString());
         $('#cntCase3').text((counts.case_3_household || 0).toLocaleString());
         $('#cntExcluded').text(((counts.missing_required || 0) + (counts.invalid_phone || 0)).toLocaleString());
@@ -304,7 +319,20 @@
                 }
 
                 currentData = res.data;
-                updateCounts(currentData.counts || {}, currentData.evaluations ? currentData.evaluations.length : 0);
+                (currentData.evaluations || []).forEach(item => {
+                    if (
+                        manuallyExcludedResponseIds.has(String(item.qualtrics_id))
+                        && ['accepted_clean', 'accepted_case_4'].includes(item.status)
+                    ) {
+                        item.unexcludedStatus = item.status;
+                        item.unexcludedCategory = item.category;
+                        item.unexcludedDescription = item.description;
+                        item.status = 'skipped_manual';
+                        item.category = 'Do Not Import';
+                        item.description = 'Flagged by user; excluded from import.';
+                    }
+                });
+                updateCounts(currentData.counts || {}, currentData.evaluations ? currentData.evaluations.length : 0, currentData.evaluations);
                 renderTable(currentData.evaluations || []);
 
                 if (currentData.limit_applied) {
@@ -316,7 +344,7 @@
                     $('#previewScopeNotice').html(`<span class="text-muted small"><i class="fas fa-infinity"></i> All time (${currentData.survey_rows_evaluated || 0} evaluated)</span>`);
                 }
 
-                const readyCount = (currentData.counts.clean_new || 0) + (currentData.counts.case_4_suspected || 0);
+                const readyCount = (currentData.evaluations || []).filter(item => ['accepted_clean', 'accepted_case_4'].includes(item.status)).length;
                 if (readyCount > 0 || currentData.note_updates_count > 0) {
                     $('#btnRunImport').prop('disabled', false);
                 }
@@ -351,7 +379,10 @@
         $('#btnRefresh').prop('disabled', true);
         $('#importAlertArea').empty();
 
-        const params = getPreviewParams();
+        const params = {
+            ...getPreviewParams(),
+            excludeResponseIds: Array.from(manuallyExcludedResponseIds)
+        };
 
         module.ajax('runImport', params)
             .then(res => {
@@ -443,6 +474,37 @@
 
         $('#btnRunImport').on('click', () => {
             runLiveImport();
+        });
+
+        $(document).on('click', '.toggle-import-exclusion', function() {
+            if (!currentData) return;
+
+            const qualtricsId = String($(this).attr('data-qualtrics-id') || '');
+            const row = (currentData.evaluations || []).find(item => String(item.qualtrics_id) === qualtricsId);
+            if (!row || !qualtricsId) return;
+
+            if (row.status === 'skipped_manual') {
+                manuallyExcludedResponseIds.delete(qualtricsId);
+                row.status = row.unexcludedStatus || 'accepted_clean';
+                row.category = row.unexcludedCategory || 'Clean New Record';
+                row.description = row.unexcludedDescription || '';
+                delete row.unexcludedStatus;
+                delete row.unexcludedCategory;
+                delete row.unexcludedDescription;
+            } else if (row.status === 'accepted_clean') {
+                manuallyExcludedResponseIds.add(qualtricsId);
+                row.unexcludedStatus = row.status;
+                row.unexcludedCategory = row.category;
+                row.unexcludedDescription = row.description;
+                row.status = 'skipped_manual';
+                row.category = 'Do Not Import';
+                row.description = 'Flagged by user; excluded from import.';
+            }
+
+            updateCounts(currentData.counts || {}, currentData.evaluations.length, currentData.evaluations);
+            renderTable(currentData.evaluations);
+            const readyCount = currentData.evaluations.filter(item => ['accepted_clean', 'accepted_case_4'].includes(item.status)).length;
+            $('#btnRunImport').prop('disabled', readyCount === 0 && !currentData.note_updates_count);
         });
 
         $('#previewSince').on('change', () => {

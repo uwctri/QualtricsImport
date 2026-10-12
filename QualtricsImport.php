@@ -132,12 +132,20 @@ class QualtricsImport extends AbstractExternalModule
         $limit = isset($payload['limit']) ? max(1, min(10000, (int)$payload['limit'])) : 1000;
         $sinceType = (string)($payload['sinceType'] ?? 'auto');
         $customStartDate = !empty($payload['startDate']) ? (string)$payload['startDate'] : null;
+        $excludedResponseIds = $payload['excludeResponseIds'] ?? [];
+        if (!is_array($excludedResponseIds)) {
+            $excludedResponseIds = [];
+        }
+        $excludedResponseIds = array_slice(array_values(array_unique(array_map(
+            static fn($id): string => (string)$id,
+            array_filter($excludedResponseIds, static fn($id): bool => is_scalar($id) && (string)$id !== '')
+        ))), 0, 10000);
 
         return match ($action) {
             'testConnection' => $this->getQualtricsClient($project_id)->testConnection(),
             'getSurveys' => ['success' => true, 'surveys' => $this->getQualtricsClient($project_id)->getSurveys()],
             'previewImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, true, false, $limit, $sinceType, $customStartDate)],
-            'runImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, false, false, $limit, $sinceType, $customStartDate)],
+            'runImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, false, false, $limit, $sinceType, $customStartDate, $excludedResponseIds)],
         };
     }
 
@@ -210,7 +218,8 @@ class QualtricsImport extends AbstractExternalModule
         bool $isCron = false,
         ?int $limit = 1000,
         ?string $sinceType = 'auto',
-        ?string $customStartDate = null
+        ?string $customStartDate = null,
+        array $excludedResponseIds = []
     ): array {
         $today = date('Y-m-d');
         $config = $this->getProjectSettings($projectId);
@@ -246,6 +255,7 @@ class QualtricsImport extends AbstractExternalModule
                 'case_1_existing_id' => 0,
                 'invalid_phone' => 0,
                 'missing_required' => 0,
+                'user_excluded' => 0,
             ],
             'evaluations' => [],
             'timestamp' => date('Y-m-d H:i:s'),
@@ -309,6 +319,7 @@ class QualtricsImport extends AbstractExternalModule
             'case_1_existing_id' => 0,
             'invalid_phone' => 0,
             'missing_required' => 0,
+            'user_excluded' => 0,
         ];
 
         // 4. Process each survey response
@@ -475,6 +486,27 @@ class QualtricsImport extends AbstractExternalModule
                         'status' => $eval['status'],
                         'matched_record_id' => $eval['matched_record']['record_id'] ?? $eval['original_record_id'] ?? null,
                         'description' => $eval['description'],
+                    ]);
+                }
+                continue;
+            }
+
+            if (
+                in_array($eval['status'], ['accepted_clean', 'accepted_case_4'], true)
+                && in_array($mapped['qualtrics_id'], $excludedResponseIds, true)
+            ) {
+                $evalSummary['category'] = 'Do Not Import';
+                $evalSummary['status'] = 'skipped_manual';
+                $evalSummary['description'] = 'Flagged by user; excluded from import.';
+                $evaluations[] = $evalSummary;
+                $categoryCounts['user_excluded']++;
+
+                if (!$isDryRun) {
+                    $this->log("Qualtrics Import: Response excluded by user", [
+                        'project_id' => $projectId,
+                        'qualtrics_id' => $mapped['qualtrics_id'],
+                        'candidate_name' => $mapped['display_name'],
+                        'status' => 'skipped_manual',
                     ]);
                 }
                 continue;

@@ -110,6 +110,12 @@ html, body {
     border: 1px solid #bee5eb;
 }
 
+.badge-manual-exclusion {
+    background-color: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #d6d8db;
+}
+
 #statusDropdownBtn {
     background-color: #ffffff !important;
     border: 1px solid #ced4da !important;
@@ -248,9 +254,16 @@ html, body {
     vertical-align: middle;
 }
 
-.table-preview td:last-child {
+.table-preview td:nth-last-child(2) {
     word-break: break-word;
     min-width: 140px;
+}
+
+.table-preview td:last-child {
+    min-width: 42px;
+    width: 42px;
+    text-align: center;
+    white-space: nowrap;
 }
 
 th.sortable {

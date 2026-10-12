@@ -107,6 +107,14 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                             </div>
                             <span class="badge badge-success ml-2" id="cntReady">0</span>
                         </label>
+                        <label class="status-option-item" for="chkStatus_do_not_import">
+                            <div class="d-flex align-items-center">
+                                <input type="checkbox" class="status-checkbox" id="chkStatus_do_not_import" value="do_not_import" checked>
+                                <i class="fas fa-ban text-secondary fa-fw mr-2"></i>
+                                <span class="status-name">Do Not Import</span>
+                            </div>
+                            <span class="badge badge-secondary ml-2" id="cntDoNotImport">0</span>
+                        </label>
                         <label class="status-option-item" for="chkStatus_imported">
                             <div class="d-flex align-items-center">
                                 <input type="checkbox" class="status-checkbox" id="chkStatus_imported" value="imported" checked>
@@ -178,6 +186,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                             <th class="sortable text-nowrap" data-sort="qualtrics_id" style="width: 105px;">Qualtrics ID <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable text-nowrap" data-sort="record_id" style="width: 80px;">Record ID <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable" data-sort="description">Decision Reason / Notes <i class="fas fa-sort sort-icon"></i></th>
+                            <th style="width: 42px;"></th>
                         </tr>
                     </thead>
                     <tbody id="previewTableBody">
