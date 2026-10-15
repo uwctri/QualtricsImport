@@ -89,6 +89,54 @@ class Deduplicator
 
             // Check Case 1: Same Qualtrics ResponseId
             if ($respId !== '' && $existing['qualtrics_id'] !== '' && $respId === $existing['qualtrics_id']) {
+                $isPossDup = (!empty($existing['notes']) && stripos($existing['notes'], 'Possible duplicate') !== false);
+                $matchedOther = null;
+                $scores = null;
+
+                if (!$isPossDup) {
+                    $cFirst = self::sanitizeName($existing['first_name'] ?? '');
+                    $cLast = self::sanitizeName($existing['last_name'] ?? '');
+                    $cPhone = $existing['phone1'] ?? '';
+
+                    foreach ($poolRecords as $other) {
+                        if ($other['record_id'] === $existing['record_id']) {
+                            continue;
+                        }
+                        $oPhone = $other['phone1'] ?? '';
+                        if ($cPhone === '' || $oPhone === '' || $cPhone !== $oPhone) {
+                            $fSim = self::nameSimilarity($cFirst, $other['first_name'] ?? '');
+                            $lSim = self::nameSimilarity($cLast, $other['last_name'] ?? '');
+                            if ($lSim >= $case4LastThreshold && $fSim >= $case4FirstThreshold) {
+                                $isPossDup = true;
+                                $matchedOther = $other;
+                                $scores = ['first' => $fSim, 'last' => $lSim];
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if ($isPossDup) {
+                    $dupDetail = !empty($existing['notes']) && stripos($existing['notes'], 'Possible duplicate') !== false
+                        ? $existing['notes']
+                        : sprintf(
+                            "Possible duplicate: Similar name to existing record %s ('%s %s') with different phone",
+                            $matchedOther['record_id'] ?? '',
+                            $matchedOther['first_name'] ?? '',
+                            $matchedOther['last_name'] ?? ''
+                        );
+
+                    return [
+                        'status' => 'imported_case_4',
+                        'category' => 'Imported - Possible Duplicate',
+                        'description' => "Qualtrics ResponseId '{$respId}' already exists in REDCap record {$existing['record_id']}. {$dupDetail}",
+                        'candidate' => $candidate,
+                        'is_duplicate' => true,
+                        'matched_record' => $matchedOther ?? $existing,
+                        'scores' => $scores,
+                    ];
+                }
+
                 return [
                     'status' => 'skipped_case_1',
                     'category' => 'Already Imported',
@@ -178,14 +226,15 @@ class Deduplicator
             }
         }
 
-        // Suspected duplicate (accepted as new record with candidate note)
+        // Suspected duplicate
         if ($suspectedDuplicateNote !== '') {
+            $allowImport = !empty($config['import_possible_duplicates']);
             return [
-                'status' => 'accepted_case_4',
-                'category' => 'Possible Duplicate (Different Phone)',
+                'status' => $allowImport ? 'accepted_case_4' : 'skipped_case_4',
+                'category' => 'Possible Duplicate',
                 'description' => $suspectedDuplicateNote,
                 'candidate' => $candidate,
-                'is_duplicate' => false,
+                'is_duplicate' => !$allowImport,
                 'candidate_note' => $suspectedDuplicateNote,
                 'matched_record' => $matchedExistingRecord,
                 'scores' => $matchedScores,

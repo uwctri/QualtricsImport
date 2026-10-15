@@ -251,6 +251,7 @@ class QualtricsImport extends AbstractExternalModule
                 'case_2_duplicate' => 0,
                 'case_3_household' => 0,
                 'case_1_existing_id' => 0,
+                'imported_case_4' => 0,
                 'invalid_phone' => 0,
                 'missing_required' => 0,
                 'user_excluded' => 0,
@@ -315,6 +316,7 @@ class QualtricsImport extends AbstractExternalModule
             'case_2_duplicate' => 0,
             'case_3_household' => 0,
             'case_1_existing_id' => 0,
+            'imported_case_4' => 0,
             'invalid_phone' => 0,
             'missing_required' => 0,
             'user_excluded' => 0,
@@ -345,18 +347,69 @@ class QualtricsImport extends AbstractExternalModule
             }
 
             if ($alreadyImported !== null) {
-                $categoryCounts['case_1_existing_id']++;
+                $isPossibleDuplicate = (!empty($alreadyImported['notes']) && stripos($alreadyImported['notes'], 'Possible duplicate') !== false);
+                $matchedDuplicateRecord = null;
+                $duplicateDescription = $isPossibleDuplicate ? $alreadyImported['notes'] : '';
+                $duplicateScores = null;
+
+                if (!$isPossibleDuplicate) {
+                    $case4LastThreshold = (float)($config['case4_last_sim'] ?? 0.95);
+                    $case4FirstThreshold = (float)($config['case4_first_sim'] ?? 0.90);
+                    $candFirst = Deduplicator::sanitizeName($alreadyImported['first_name'] ?? '');
+                    $candLast = Deduplicator::sanitizeName($alreadyImported['last_name'] ?? '');
+                    $candPhone = $alreadyImported['phone1'] ?? '';
+
+                    foreach ($poolRecords as $other) {
+                        if ($other['record_id'] === $alreadyImported['record_id']) {
+                            continue;
+                        }
+                        $otherPhone = $other['phone1'] ?? '';
+                        $otherFirst = $other['first_name'] ?? '';
+                        $otherLast = $other['last_name'] ?? '';
+
+                        if ($candPhone === '' || $otherPhone === '' || $candPhone !== $otherPhone) {
+                            $firstSim = Deduplicator::nameSimilarity($candFirst, $otherFirst);
+                            $lastSim = Deduplicator::nameSimilarity($candLast, $otherLast);
+
+                            if ($lastSim >= $case4LastThreshold && $firstSim >= $case4FirstThreshold) {
+                                $isPossibleDuplicate = true;
+                                $matchedDuplicateRecord = $other;
+                                $duplicateScores = ['first' => $firstSim, 'last' => $lastSim];
+                                $duplicateDescription = sprintf(
+                                    "Possible duplicate: Similar name to existing record %s ('%s %s') with different phone (scores: first=%.2f, last=%.2f)",
+                                    $other['record_id'],
+                                    $otherFirst,
+                                    $otherLast,
+                                    $firstSim,
+                                    $lastSim
+                                );
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                $status = $isPossibleDuplicate ? 'imported_case_4' : 'skipped_case_1';
+                $category = $isPossibleDuplicate ? 'Imported - Possible Duplicate' : 'Already Imported';
+                if ($isPossibleDuplicate) {
+                    $categoryCounts['imported_case_4']++;
+                    $desc = "Qualtrics ResponseId '{$respId}' already exists in REDCap record {$alreadyImported['record_id']}. {$duplicateDescription}";
+                } else {
+                    $categoryCounts['case_1_existing_id']++;
+                    $desc = "Qualtrics ResponseId '{$respId}' already exists in REDCap record {$alreadyImported['record_id']}";
+                }
+
                 $evalSummary = [
-                    'category' => 'Already Imported',
-                    'status' => 'skipped_case_1',
-                    'description' => "Qualtrics ResponseId '{$respId}' already exists in REDCap record {$alreadyImported['record_id']}",
+                    'category' => $category,
+                    'status' => $status,
+                    'description' => $desc,
                     'qualtrics_id' => $respId,
                     'start_date' => $startDate,
                     'candidate_name' => trim("{$alreadyImported['first_name']} {$alreadyImported['last_name']}"),
                     'candidate_phone' => $alreadyImported['phone1'],
                     'record_id' => $alreadyImported['record_id'],
-                    'matched_record_id' => $alreadyImported['record_id'],
-                    'scores' => null,
+                    'matched_record_id' => $matchedDuplicateRecord['record_id'] ?? $alreadyImported['record_id'],
+                    'scores' => $duplicateScores,
                 ];
                 $evaluations[] = $evalSummary;
 
@@ -366,9 +419,9 @@ class QualtricsImport extends AbstractExternalModule
                         'qualtrics_id' => $respId,
                         'candidate_name' => $evalSummary['candidate_name'],
                         'candidate_phone' => $evalSummary['candidate_phone'],
-                        'category' => 'Already Imported',
-                        'status' => 'skipped_case_1',
-                        'matched_record_id' => $alreadyImported['record_id'],
+                        'category' => $category,
+                        'status' => $status,
+                        'matched_record_id' => $evalSummary['matched_record_id'],
                         'description' => $evalSummary['description'],
                     ]);
                 }
@@ -409,7 +462,7 @@ class QualtricsImport extends AbstractExternalModule
             if ($mapped === null) {
                 $previewInfo = FieldMapper::extractCandidatePreviewInfo($rawRow, $config);
                 $evaluations[] = [
-                    'category' => 'Ineligible / Missing Fields',
+                    'category' => 'Ineligible',
                     'status' => 'skipped_ineligible',
                     'description' => $exclusionReason ?: 'Response excluded by filter logic or missing required fields',
                     'qualtrics_id' => $respId,
@@ -496,8 +549,10 @@ class QualtricsImport extends AbstractExternalModule
 
                 match ($eval['status']) {
                     'skipped_case_1' => $categoryCounts['case_1_existing_id']++,
+                    'imported_case_4' => $categoryCounts['imported_case_4']++,
                     'skipped_case_2' => $categoryCounts['case_2_duplicate']++,
                     'rejected_case_3' => $categoryCounts['case_3_household']++,
+                    'skipped_case_4' => $categoryCounts['case_4_suspected']++,
                     default => $categoryCounts['invalid_phone']++,
                 };
 

@@ -10,7 +10,8 @@
         'ready': ['accepted_clean'],
         'do_not_import': ['skipped_manual'],
         'imported': ['skipped_case_1'],
-        'case_4': ['accepted_case_4'],
+        'imported_case_4': ['imported_case_4'],
+        'case_4': ['accepted_case_4', 'skipped_case_4'],
         'case_2': ['skipped_case_2'],
         'case_3': ['rejected_case_3'],
         'excluded': ['skipped_ineligible', 'rejected_invalid_phone']
@@ -19,10 +20,11 @@
         'ready': 'Ready',
         'do_not_import': 'Do Not Import',
         'imported': 'Imported',
+        'imported_case_4': 'Imported - Poss Dup',
         'case_4': 'Possible Dups',
         'case_2': 'Duplicates',
         'case_3': 'Shared Phone',
-        'excluded': 'Excluded'
+        'excluded': 'Ineligible'
     };
     const ALL_STATUS_KEYS = Object.keys(STATUS_MAP);
     let selectedStatuses = new Set(ALL_STATUS_KEYS);
@@ -74,7 +76,8 @@
         if (status === 'skipped_manual') return `<span class="badge-status badge-manual-exclusion">${category}</span>`;
         if (status === 'skipped_case_2') return `<span class="badge-status badge-case-2">${category}</span>`;
         if (status === 'rejected_case_3') return `<span class="badge-status badge-case-3">${category}</span>`;
-        if (status === 'accepted_case_4') return `<span class="badge-status badge-case-4">${category}</span>`;
+        if (status === 'accepted_case_4' || status === 'skipped_case_4') return `<span class="badge-status badge-case-4">${category}</span>`;
+        if (status === 'imported_case_4') return `<span class="badge-status badge-imported-case-4">${category}</span>`;
         if (status === 'skipped_case_1') return `<span class="badge-status badge-imported">${category}</span>`;
         if (status === 'rejected_invalid_phone' || status === 'skipped_ineligible') {
             return `<span class="badge-status badge-invalid">${category}</span>`;
@@ -291,8 +294,9 @@
         $('#cntTotalBadge').text(`${(total || 0).toLocaleString()} total`);
         $('#cntReady').text(readyCount.toLocaleString());
         $('#cntDoNotImport').text(visibleEvaluations.filter(item => item.status === 'skipped_manual').length.toLocaleString());
-        $('#cntImported').text((counts.case_1_existing_id || 0).toLocaleString());
-        $('#cntCase4').text(visibleEvaluations.filter(item => item.status === 'accepted_case_4').length.toLocaleString());
+        $('#cntImported').text(visibleEvaluations.filter(item => item.status === 'skipped_case_1').length.toLocaleString());
+        $('#cntImportedCase4').text(visibleEvaluations.filter(item => item.status === 'imported_case_4').length.toLocaleString());
+        $('#cntCase4').text(visibleEvaluations.filter(item => ['accepted_case_4', 'skipped_case_4'].includes(item.status)).length.toLocaleString());
         $('#cntCase2').text((counts.case_2_duplicate || 0).toLocaleString());
         $('#cntCase3').text((counts.case_3_household || 0).toLocaleString());
         $('#cntExcluded').text(((counts.missing_required || 0) + (counts.invalid_phone || 0)).toLocaleString());

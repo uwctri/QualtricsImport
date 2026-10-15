@@ -110,6 +110,12 @@ html, body {
     border: 1px solid #bee5eb;
 }
 
+.badge-imported-case-4 {
+    background-color: #e2d9f3;
+    color: #381a74;
+    border: 1px solid #d1c2ea;
+}
+
 .badge-manual-exclusion {
     background-color: #e2e3e5;
     color: #383d41;

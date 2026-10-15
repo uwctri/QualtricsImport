@@ -105,9 +105,9 @@
             "name": "Scheduled Sync Frequency",
             "type": "dropdown",
             "choices": [
-                { "value": "900", "name": "Every 15 minutes" },
                 { "value": "3600", "name": "Hourly" },
-                { "value": "86400", "name": "Daily" }
+                { "value": "86400", "name": "Daily" },
+                { "value": "604800", "name": "Weekly" }
             ],
             "default": "3600",
             "branchingLogic": {
@@ -215,6 +215,11 @@
             "key": "import_notes_field",
             "name": "Import Notes Field (for duplicate warnings and shared phone notices)",
             "type": "field-list"
+        },
+        {
+            "key": "import_possible_duplicates",
+            "name": "Import Possible Duplicates",
+            "type": "checkbox"
         },
         {
             "key": "mapping_header",

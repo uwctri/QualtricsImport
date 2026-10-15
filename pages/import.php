@@ -123,6 +123,14 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                             </div>
                             <span class="badge badge-info ml-2" id="cntImported">0</span>
                         </label>
+                        <label class="status-option-item" for="chkStatus_imported_case_4">
+                            <div class="d-flex align-items-center">
+                                <input type="checkbox" class="status-checkbox" id="chkStatus_imported_case_4" value="imported_case_4" checked>
+                                <i class="fas fa-user-check fa-fw mr-2" style="color: #6f42c1;"></i>
+                                <span class="status-name">Imported - Possible Duplicate</span>
+                            </div>
+                            <span class="badge badge-purple ml-2" id="cntImportedCase4" style="background-color: #6f42c1; color: #fff;">0</span>
+                        </label>
                         <label class="status-option-item" for="chkStatus_case_4">
                             <div class="d-flex align-items-center">
                                 <input type="checkbox" class="status-checkbox" id="chkStatus_case_4" value="case_4" checked>
@@ -151,7 +159,7 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
                             <div class="d-flex align-items-center">
                                 <input type="checkbox" class="status-checkbox" id="chkStatus_excluded" value="excluded" checked>
                                 <i class="fas fa-ban text-secondary fa-fw mr-2"></i>
-                                <span class="status-name">Excluded / Ineligible</span>
+                                <span class="status-name">Ineligible</span>
                             </div>
                             <span class="badge badge-secondary ml-2" id="cntExcluded">0</span>
                         </label>
