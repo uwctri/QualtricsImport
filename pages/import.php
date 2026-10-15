@@ -22,6 +22,8 @@ $module->includeJs('js/import.js');
 
 $mappingMode = (string)($module->getProjectSetting('mapping_mode', $projectId) ?: 'auto_map_blacklist');
 $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $projectId);
+$cronEnabled = (bool)$module->getProjectSetting('import_enabled', $projectId);
+$lastCronError = (string)$module->getProjectSetting('last_cron_error', $projectId);
 ?>
 
 <div class="qualtrics-import-container">
@@ -35,6 +37,15 @@ $lastSync = (string)$module->getProjectSetting('last_successful_sync_time', $pro
             </div>
         </div>
     </div>
+
+    <?php if ($cronEnabled && !empty($lastCronError)): ?>
+    <div class="alert alert-warning py-2 px-3 mb-3 small d-flex align-items-center justify-content-between">
+        <div>
+            <i class="fas fa-exclamation-triangle text-danger mr-2"></i>
+            <strong>Background Cron Sync Error:</strong> <?= htmlspecialchars($lastCronError) ?>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Controls Toolbar -->
     <div class="qualtrics-card mb-3 p-2 px-3 bg-light d-flex align-items-center justify-content-between flex-wrap">

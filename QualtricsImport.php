@@ -167,11 +167,21 @@ class QualtricsImport extends AbstractExternalModule
                 continue;
 
             $surveyId = trim((string)$this->getProjectSetting('qualtrics_survey_id', $projectId));
-            if ($surveyId === '')
-                continue; // Silently skip if survey ID is not configured (no error logging)
+            if ($surveyId === '') {
+                $msg = "Qualtrics Survey ID is not configured for project {$projectId}.";
+                $this->setProjectSetting('last_cron_error', $msg, $projectId);
+                $this->log("Qualtrics Import: Cron skipped", ['project_id' => $projectId, 'error' => $msg]);
+                error_log("Qualtrics Import Cron Warning (PID {$projectId}): {$msg}");
+                continue;
+            }
 
-            if (!$this->hasQualtricsCredentials($projectId))
-                continue; // Silently skip if credentials are not configured (no error logging)
+            if (!$this->hasQualtricsCredentials($projectId)) {
+                $msg = "Qualtrics credentials (API token / data center) are not configured for project {$projectId}.";
+                $this->setProjectSetting('last_cron_error', $msg, $projectId);
+                $this->log("Qualtrics Import: Cron skipped", ['project_id' => $projectId, 'error' => $msg]);
+                error_log("Qualtrics Import Cron Warning (PID {$projectId}): {$msg}");
+                continue;
+            }
 
             $frequency = (int)($this->getProjectSetting('sync_frequency', $projectId) ?: 3600);
             $lastRun = (int)$this->getProjectSetting('last_cron_run_timestamp', $projectId);
@@ -180,12 +190,43 @@ class QualtricsImport extends AbstractExternalModule
             if (($now - $lastRun) < $frequency)
                 continue;
 
+            $this->setProjectSetting('last_cron_run_timestamp', $now, $projectId);
+
             try {
-                $this->executeImportPipeline($projectId, false, true);
-                $this->setProjectSetting('last_cron_run_timestamp', $now, $projectId);
-                $processedCount++;
-            } catch (Throwable) {
-                // Silently skip any errors during cron to prevent nuisance PHP error logs
+                $pipelineRes = $this->executeImportPipeline($projectId, false, true);
+
+                if (!empty($pipelineRes['message'])) {
+                    $msg = $pipelineRes['message'];
+                    $this->setProjectSetting('last_cron_error', $msg, $projectId);
+                    $this->log("Qualtrics Import: Cron sync error for project {$projectId}", [
+                        'project_id' => $projectId,
+                        'error' => $msg,
+                    ]);
+                    error_log("Qualtrics Import Cron Error (PID {$projectId}): {$msg}");
+                } elseif (!empty($pipelineRes['commit_results']['errors'])) {
+                    $errorsJson = json_encode($pipelineRes['commit_results']['errors']);
+                    $this->setProjectSetting('last_cron_error', "Import commit error: {$errorsJson}", $projectId);
+                    $this->log("Qualtrics Import: Cron import save errors for project {$projectId}", [
+                        'project_id' => $projectId,
+                        'errors' => $errorsJson,
+                    ]);
+                    error_log("Qualtrics Import Cron Commit Error (PID {$projectId}): {$errorsJson}");
+                    $processedCount++;
+                } else {
+                    $this->removeProjectSetting('last_cron_error', $projectId);
+                    $processedCount++;
+                }
+            } catch (Throwable $e) {
+                $errorMsg = $e->getMessage();
+                $errorLocation = $e->getFile() . ':' . $e->getLine();
+                $this->setProjectSetting('last_cron_error', "{$errorMsg} ({$errorLocation})", $projectId);
+                $this->log("Qualtrics Import: Cron sync error for project {$projectId}", [
+                    'project_id' => $projectId,
+                    'error' => $errorMsg,
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]);
+                error_log("Qualtrics Import Cron Exception (PID {$projectId}): {$errorMsg} in {$errorLocation}\n" . $e->getTraceAsString());
             }
         }
 
