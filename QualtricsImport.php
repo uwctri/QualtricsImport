@@ -5,6 +5,7 @@ namespace UWMadison\QualtricsImport;
 use ExternalModules\AbstractExternalModule;
 use ExternalModules\ExternalModules;
 use REDCap;
+use Project;
 use Exception;
 use Throwable;
 
@@ -260,15 +261,13 @@ class QualtricsImport extends AbstractExternalModule
             }
         }
         try {
-            if (method_exists($this, 'getSubSettings')) {
-                $subMappings = $this->getSubSettings('custom_value_mappings', $projectId);
-                if (!empty($subMappings) && is_array($subMappings))
-                    $config['custom_value_mappings'] = $subMappings;
-                $subDefaults = $this->getSubSettings('static_field_defaults', $projectId);
-                if (!empty($subDefaults) && is_array($subDefaults))
-                    $config['static_field_defaults'] = $subDefaults;
-            }
-        } catch (\Throwable) {
+            $subMappings = $this->getSubSettings('custom_value_mappings', $projectId);
+            if (!empty($subMappings) && is_array($subMappings))
+                $config['custom_value_mappings'] = $subMappings;
+            $subDefaults = $this->getSubSettings('static_field_defaults', $projectId);
+            if (!empty($subDefaults) && is_array($subDefaults))
+                $config['static_field_defaults'] = $subDefaults;
+        } catch (Throwable) {
             // Fall back to getProjectSettings
         }
         $surveyId = trim((string)($config['qualtrics_survey_id'] ?? ''));
@@ -298,7 +297,7 @@ class QualtricsImport extends AbstractExternalModule
 
         if (!empty($config['target_event'])) {
             $targetEvent = (string)$config['target_event'];
-            $uniqueEventNames = (new \Project($projectId))->getUniqueEventNames();
+            $uniqueEventNames = (new Project($projectId))->getUniqueEventNames();
             if (isset($uniqueEventNames[$targetEvent]))
                 $config['target_event'] = $uniqueEventNames[$targetEvent];
             elseif (!in_array($targetEvent, $uniqueEventNames, true)) {
@@ -333,9 +332,10 @@ class QualtricsImport extends AbstractExternalModule
             $rawSurveyRows = array_slice($rawSurveyRows, 0, $limit);
 
         // 2. Fetch existing records and metadata from REDCap
-        $poolRecords = RecordManager::fetchExistingRecords($projectId, $config);
         $dict = REDCap::getDataDictionary($projectId, 'array') ?: [];
         $fieldNames = array_keys($dict);
+        $recordIdField = RecordManager::getRecordIdField($projectId, $dict);
+        $poolRecords = RecordManager::fetchExistingRecords($projectId, $config, $dict);
 
         // 3. Processing queues
         $seedCounter = 0;
@@ -573,7 +573,7 @@ class QualtricsImport extends AbstractExternalModule
 
                     $targetEvent = $config['target_event'] ?? '';
                     $noteUpdateRecord = [
-                        REDCap::getRecordIdField() => $origId,
+                        $recordIdField => $origId,
                         $notesField => ($origNotes !== '') ? "{$origNotes}\n{$noteEntry}" : $noteEntry,
                     ];
                     if ($targetEvent !== '')
@@ -615,7 +615,7 @@ class QualtricsImport extends AbstractExternalModule
                 $mapped['qualtrics_id']
             );
 
-            $mapped[REDCap::getRecordIdField()] = $allocatedId;
+            $mapped[$recordIdField] = $allocatedId;
             if (!isset($mapped['import_date']))
                 $mapped['import_date'] = $today;
             if (!isset($mapped['first_import_date']))
@@ -650,7 +650,7 @@ class QualtricsImport extends AbstractExternalModule
         $surveyTagMap = [];
         try {
             $surveyTagMap = $client->getSurveyQuestionTags($surveyId);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $surveyTagMap = [];
         }
 

@@ -214,7 +214,7 @@ class FieldMapper
         }
 
         // Attempt native REDCap LogicTester if Project context is available
-        if ($projectId !== null && class_exists(LogicTester::class) && class_exists(Project::class)) {
+        if ($projectId !== null) {
             try {
                 $proj = new Project($projectId);
                 $eventId = !empty($record['redcap_event_name']) && isset($proj->uniqueEventNames[$record['redcap_event_name']])

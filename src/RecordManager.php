@@ -3,15 +3,48 @@
 namespace UWMadison\QualtricsImport;
 
 use REDCap;
+use Project;
+use Throwable;
 
 class RecordManager
 {
     /**
+     * Determine the record ID field name for a given project in a context-safe way.
+     */
+    public static function getRecordIdField(int $projectId, ?array $dict = null): string
+    {
+        if (!empty($dict)) {
+            $firstField = array_key_first($dict);
+            if (!empty($firstField))
+                return (string)$firstField;
+        }
+
+        try {
+            $proj = new Project($projectId);
+            if (!empty($proj->table_pk))
+                return (string)$proj->table_pk;
+        } catch (Throwable) {
+        }
+
+        try {
+            $dict = REDCap::getDataDictionary($projectId, 'array');
+            if (!empty($dict)) {
+                $firstField = array_key_first($dict);
+                if (!empty($firstField))
+                    return (string)$firstField;
+            }
+        } catch (Throwable) {
+        }
+
+        return 'record_id';
+    }
+
+    /**
      * Fetch existing records from REDCap for deduplication matching and seed determination.
      */
-    public static function fetchExistingRecords(int $projectId, array $config): array
+    public static function fetchExistingRecords(int $projectId, array $config, ?array $dict = null): array
     {
-        $idField = REDCap::getRecordIdField();
+        $idField = self::getRecordIdField($projectId, $dict);
         $strategy = $config['record_id_strategy'] ?? 'seed_increment';
         $qualtricsIdField = ($strategy === 'qualtrics_response_id') ? $idField : ($config['qualtrics_id_field'] ?? 'qualtrics_id');
         $phoneField = $config['dedup_phone_field'] ?? 'phone1';
