@@ -236,10 +236,10 @@ class Deduplicator
             ];
         }
 
-        // Clean New Record
+        // New Record
         return [
             'status' => 'accepted_clean',
-            'category' => 'Clean New Record',
+            'category' => 'New Record',
             'description' => 'No duplicate conflicts detected',
             'candidate' => $candidate,
             'is_duplicate' => false,

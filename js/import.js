@@ -278,7 +278,7 @@
             row.description = 'Flagged by user; excluded from import.';
         } else {
             row.status = row.unexcludedStatus || row.unexcluded_status || 'accepted_clean';
-            row.category = row.unexcludedCategory || row.unexcluded_category || 'Clean New Record';
+            row.category = row.unexcludedCategory || row.unexcluded_category || 'New Record';
             row.description = row.unexcludedDescription || row.unexcluded_description || '';
             delete row.unexcludedStatus;
             delete row.unexcludedCategory;

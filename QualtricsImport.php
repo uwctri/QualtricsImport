@@ -472,7 +472,7 @@ class QualtricsImport extends AbstractExternalModule
                     'candidate_phone' => $previewInfo['phone'],
                     'record_id' => null,
                     'unexcluded_status' => 'accepted_clean',
-                    'unexcluded_category' => 'Clean New Record',
+                    'unexcluded_category' => 'New Record',
                     'unexcluded_description' => 'No duplicate conflicts detected',
                     'scores' => null,
                 ];
