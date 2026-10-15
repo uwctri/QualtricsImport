@@ -195,7 +195,7 @@ $lastCronError = (string)$module->getProjectSetting('last_cron_error', $projectI
 
         <!-- Responses Table -->
         <div class="qualtrics-card">
-            <div class="table-responsive">
+            <div class="table-responsive table-preview-container">
                 <table class="table table-hover table-striped table-preview mb-0">
                     <thead>
                         <tr>
