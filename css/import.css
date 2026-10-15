@@ -73,6 +73,7 @@ body {
     padding: 4px 8px;
     border-radius: 4px;
     display: inline-block;
+    white-space: nowrap;
 }
 
 .badge-clean {
@@ -268,8 +269,8 @@ body {
 }
 
 .table-preview td:last-child {
-    min-width: 85px;
-    width: 85px;
+    min-width: 44px;
+    width: 44px;
     text-align: center;
     white-space: nowrap;
 }

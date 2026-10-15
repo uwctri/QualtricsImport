@@ -246,8 +246,8 @@
             if (!module.importPossibleDuplicates && row.qualtrics_id && (row.status === 'skipped_case_4' || (row.status === 'accepted_case_4' && flaggedCase4ImportIds.has(String(row.qualtrics_id))))) {
                 const isFlagged = flaggedCase4ImportIds.has(String(row.qualtrics_id));
                 actionButton = isFlagged
-                    ? `<button type="button" class="btn btn-sm btn-success toggle-case4-import" data-qualtrics-id="${qualtricsIdAttribute}" title="Flagged to import (click to undo)"><i class="fas fa-check mr-1"></i>Import</button>`
-                    : `<button type="button" class="btn btn-sm btn-outline-primary toggle-case4-import" data-qualtrics-id="${qualtricsIdAttribute}" title="Flag to import"><i class="fas fa-file-import mr-1"></i>Import</button>`;
+                    ? `<button type="button" class="btn btn-sm btn-success toggle-case4-import" data-qualtrics-id="${qualtricsIdAttribute}" title="Flagged to import (click to undo)" aria-label="Flagged to import"><i class="fas fa-check"></i></button>`
+                    : `<button type="button" class="btn btn-sm btn-outline-primary toggle-case4-import" data-qualtrics-id="${qualtricsIdAttribute}" title="Flag to import" aria-label="Flag to import"><i class="fas fa-file-import"></i></button>`;
             } else if (row.qualtrics_id && (row.status === 'accepted_clean' || row.status === 'skipped_manual' || (Boolean(module.importPossibleDuplicates) && row.status === 'accepted_case_4'))) {
                 actionButton = `<button type="button" class="btn btn-sm ${row.status === 'skipped_manual' ? 'btn-outline-success' : 'btn-outline-danger'} toggle-import-exclusion" data-qualtrics-id="${qualtricsIdAttribute}" title="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" aria-label="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" ${manualExclusionSaveInProgress ? 'disabled' : ''}><i class="fas ${row.status === 'skipped_manual' ? 'fa-undo' : 'fa-times'}"></i></button>`;
             }

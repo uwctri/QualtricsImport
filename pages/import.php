@@ -199,14 +199,14 @@ $lastCronError = (string)$module->getProjectSetting('last_cron_error', $projectI
                 <table class="table table-hover table-striped table-preview mb-0">
                     <thead>
                         <tr>
-                            <th class="sortable text-nowrap" data-sort="status" style="width: 105px;">Status <i class="fas fa-sort sort-icon"></i></th>
+                            <th class="sortable text-nowrap" data-sort="status" style="width: 140px;">Status <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable text-nowrap" data-sort="start_date" style="width: 115px;">Date <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable text-nowrap" data-sort="name" style="width: 130px;">Candidate Name <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable text-nowrap" data-sort="phone" style="width: 110px;">Phone <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable text-nowrap" data-sort="qualtrics_id" style="width: 105px;">Qualtrics ID <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable text-nowrap" data-sort="record_id" style="width: 80px;">Record ID <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable" data-sort="description">Decision Reason / Notes <i class="fas fa-sort sort-icon"></i></th>
-                            <th style="width: 85px;"></th>
+                            <th style="width: 44px;"></th>
                         </tr>
                     </thead>
                     <tbody id="previewTableBody">
