@@ -1,5 +1,6 @@
 /* Styling for Qualtrics Import UI */
-html, body {
+html,
+body {
     overflow-x: hidden !important;
 }
 
@@ -42,7 +43,7 @@ html, body {
 
 .qualtrics-card {
     border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     background-color: #ffffff;
     border: 1px solid #dee2e6;
     margin-bottom: 20px;
@@ -131,7 +132,7 @@ html, body {
     border-radius: 5px;
     display: inline-flex;
     align-items: center;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     transition: all 0.15s ease-in-out;
 }
 
@@ -141,11 +142,11 @@ html, body {
     background-color: #f8f9fa !important;
     border-color: #adb5bd !important;
     color: #212529 !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .status-filter-dropdown .dropdown-menu {
-    min-width: 250px;
+    min-width: 245px;
     padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid #dee2e6;
@@ -212,7 +213,8 @@ html, body {
     transition: all 0.2s;
 }
 
-.filter-pill:hover, .filter-pill.active {
+.filter-pill:hover,
+.filter-pill.active {
     background-color: #007bff;
     color: #ffffff;
     border-color: #007bff;
@@ -225,7 +227,7 @@ html, body {
 }
 
 .filter-pill.active .badge {
-    background-color: rgba(255,255,255,0.9);
+    background-color: rgba(255, 255, 255, 0.9);
     color: #007bff;
 }
 
@@ -266,8 +268,8 @@ html, body {
 }
 
 .table-preview td:last-child {
-    min-width: 42px;
-    width: 42px;
+    min-width: 85px;
+    width: 85px;
     text-align: center;
     white-space: nowrap;
 }

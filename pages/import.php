@@ -17,6 +17,7 @@ $module->initializeJavascriptModuleObject();
 $module->passArgument('projectId', $projectId);
 $module->passArgument('prefix', $module->PREFIX);
 $module->passArgument('hasSurveyId', $hasSurveyId);
+$module->passArgument('importPossibleDuplicates', (bool)$module->getProjectSetting('import_possible_duplicates', $projectId));
 $module->includeCss('css/import.css');
 $module->includeJs('js/import.js');
 
@@ -205,7 +206,7 @@ $lastCronError = (string)$module->getProjectSetting('last_cron_error', $projectI
                             <th class="sortable text-nowrap" data-sort="qualtrics_id" style="width: 105px;">Qualtrics ID <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable text-nowrap" data-sort="record_id" style="width: 80px;">Record ID <i class="fas fa-sort sort-icon"></i></th>
                             <th class="sortable" data-sort="description">Decision Reason / Notes <i class="fas fa-sort sort-icon"></i></th>
-                            <th style="width: 42px;"></th>
+                            <th style="width: 85px;"></th>
                         </tr>
                     </thead>
                     <tbody id="previewTableBody">

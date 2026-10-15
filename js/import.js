@@ -4,10 +4,11 @@
 
     let currentData = null;
     const manuallyExcludedResponseIds = new Set();
+    const flaggedCase4ImportIds = new Set();
     let manualExclusionsLoaded = false;
     let manualExclusionSaveInProgress = false;
     const STATUS_MAP = {
-        'ready': ['accepted_clean'],
+        'ready': ['accepted_clean', 'accepted_case_4'],
         'do_not_import': ['skipped_manual'],
         'imported': ['skipped_case_1'],
         'imported_case_4': ['imported_case_4'],
@@ -238,13 +239,18 @@
             const allocatedId = row.record_id ? `<strong>${row.record_id}</strong>` : '<span class="text-muted">-</span>';
             const formattedDate = formatStartDate(row.start_date);
             const dateTitle = (row.start_date && formattedDate !== '-') ? ` title="Qualtrics UTC: ${String(row.start_date).replace(/"/g, '&quot;')}"` : '';
-            const canToggleImport = row.status === 'accepted_clean' || row.status === 'skipped_manual';
             const qualtricsIdAttribute = row.qualtrics_id
                 ? $('<div>').text(String(row.qualtrics_id)).html().replace(/"/g, '&quot;')
                 : '';
-            const actionButton = canToggleImport && row.qualtrics_id
-                ? `<button type="button" class="btn btn-sm ${row.status === 'skipped_manual' ? 'btn-outline-success' : 'btn-outline-danger'} toggle-import-exclusion" data-qualtrics-id="${qualtricsIdAttribute}" title="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" aria-label="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" ${manualExclusionSaveInProgress ? 'disabled' : ''}><i class="fas ${row.status === 'skipped_manual' ? 'fa-undo' : 'fa-times'}"></i></button>`
-                : '';
+            let actionButton = '';
+            if (!module.importPossibleDuplicates && row.qualtrics_id && (row.status === 'skipped_case_4' || (row.status === 'accepted_case_4' && flaggedCase4ImportIds.has(String(row.qualtrics_id))))) {
+                const isFlagged = flaggedCase4ImportIds.has(String(row.qualtrics_id));
+                actionButton = isFlagged
+                    ? `<button type="button" class="btn btn-sm btn-success toggle-case4-import" data-qualtrics-id="${qualtricsIdAttribute}" title="Flagged to import (click to undo)"><i class="fas fa-check mr-1"></i>Import</button>`
+                    : `<button type="button" class="btn btn-sm btn-outline-primary toggle-case4-import" data-qualtrics-id="${qualtricsIdAttribute}" title="Flag to import"><i class="fas fa-file-import mr-1"></i>Import</button>`;
+            } else if (row.qualtrics_id && (row.status === 'accepted_clean' || row.status === 'skipped_manual' || (Boolean(module.importPossibleDuplicates) && row.status === 'accepted_case_4'))) {
+                actionButton = `<button type="button" class="btn btn-sm ${row.status === 'skipped_manual' ? 'btn-outline-success' : 'btn-outline-danger'} toggle-import-exclusion" data-qualtrics-id="${qualtricsIdAttribute}" title="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" aria-label="${row.status === 'skipped_manual' ? 'Undo do not import' : 'Do not import'}" ${manualExclusionSaveInProgress ? 'disabled' : ''}><i class="fas ${row.status === 'skipped_manual' ? 'fa-undo' : 'fa-times'}"></i></button>`;
+            }
 
             const tr = `
                 <tr>
@@ -317,6 +323,8 @@
 
     const loadPreview = () => {
         if (!manualExclusionsLoaded) return;
+
+        flaggedCase4ImportIds.clear();
 
         if (!module.hasSurveyId) {
             $('#previewLoading').hide();
@@ -406,6 +414,8 @@
         $('#importAlertArea').empty();
 
         const params = getPreviewParams();
+        if (flaggedCase4ImportIds.size > 0)
+            params.forceImportResponseIds = Array.from(flaggedCase4ImportIds);
 
         module.ajax('runImport', params)
             .then(res => {
@@ -536,6 +546,29 @@
                     const readyCount = currentData.evaluations.filter(item => ['accepted_clean', 'accepted_case_4'].includes(item.status)).length;
                     $('#btnRunImport').prop('disabled', readyCount === 0 && !currentData.note_updates_count);
                 });
+        });
+
+        $(document).on('click', '.toggle-case4-import', function () {
+            if (!currentData) return;
+
+            const qualtricsId = String($(this).attr('data-qualtrics-id') || '');
+            const row = (currentData.evaluations || []).find(item => String(item.qualtrics_id) === qualtricsId);
+            if (!row || !qualtricsId) return;
+
+            if (flaggedCase4ImportIds.has(qualtricsId)) {
+                flaggedCase4ImportIds.delete(qualtricsId);
+                row.status = 'skipped_case_4';
+                row.is_duplicate = true;
+            } else {
+                flaggedCase4ImportIds.add(qualtricsId);
+                row.status = 'accepted_case_4';
+                row.is_duplicate = false;
+            }
+
+            updateCounts(currentData.counts || {}, currentData.evaluations.length, currentData.evaluations);
+            renderTable(currentData.evaluations);
+            const readyCount = currentData.evaluations.filter(item => ['accepted_clean', 'accepted_case_4'].includes(item.status)).length;
+            $('#btnRunImport').prop('disabled', readyCount === 0 && !currentData.note_updates_count);
         });
 
         $('#previewSince').on('change', () => {

@@ -124,6 +124,9 @@ class QualtricsImport extends AbstractExternalModule
         $limit = isset($payload['limit']) ? max(1, min(10000, (int)$payload['limit'])) : 1000;
         $sinceType = (string)($payload['sinceType'] ?? 'auto');
         $customStartDate = !empty($payload['startDate']) ? (string)$payload['startDate'] : null;
+        $forceImportResponseIds = !empty($payload['forceImportResponseIds']) && is_array($payload['forceImportResponseIds'])
+            ? $payload['forceImportResponseIds']
+            : null;
 
         return match ($action) {
             'testConnection' => $this->getQualtricsClient($project_id)->testConnection(),
@@ -134,7 +137,7 @@ class QualtricsImport extends AbstractExternalModule
                 'responseIds' => $this->saveManuallyExcludedResponseIds((int)$project_id, $payload['responseIds'] ?? null),
             ],
             'previewImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, true, false, $limit, $sinceType, $customStartDate)],
-            'runImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, false, false, $limit, $sinceType, $customStartDate)],
+            'runImport' => ['success' => true, 'data' => $this->executeImportPipeline($project_id, false, false, $limit, $sinceType, $customStartDate, null, $forceImportResponseIds)],
         };
     }
 
@@ -243,11 +246,19 @@ class QualtricsImport extends AbstractExternalModule
         ?int $limit = 1000,
         ?string $sinceType = 'auto',
         ?string $customStartDate = null,
-        ?array $excludedResponseIds = null
+        ?array $excludedResponseIds = null,
+        ?array $forceImportResponseIds = null
     ): array {
         $today = date('Y-m-d');
         $config = $this->getProjectSettings($projectId);
         $excludedResponseIds ??= $this->getManuallyExcludedResponseIds($projectId);
+        $forceImportLookup = [];
+        if (!empty($forceImportResponseIds)) {
+            foreach ($forceImportResponseIds as $fid) {
+                if (is_scalar($fid))
+                    $forceImportLookup[trim((string)$fid)] = true;
+            }
+        }
         try {
             if (method_exists($this, 'getSubSettings')) {
                 $subMappings = $this->getSubSettings('custom_value_mappings', $projectId);
@@ -508,6 +519,11 @@ class QualtricsImport extends AbstractExternalModule
 
             // Deduplication evaluation
             $eval = Deduplicator::evaluateCandidate($mapped, $poolRecords, $config, $today);
+
+            if ($eval['status'] === 'skipped_case_4' && isset($forceImportLookup[$respId])) {
+                $eval['status'] = 'accepted_case_4';
+                $eval['is_duplicate'] = false;
+            }
 
             $evalSummary = [
                 'category' => $eval['category'],
