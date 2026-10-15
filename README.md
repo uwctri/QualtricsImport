@@ -1,14 +1,17 @@
 # Qualtrics Import
 
-A REDCap External Module to import survey screening responses from Qualtrics with automated deduplication and sanitization.
+A REDCap External Module to import survey screening responses (or anything else) from Qualtrics with automated deduplication and sanitization.
 
 ## Features
-- **Automatic Sanitization**: Detects and standardizes dates (`YYYY-MM-DD`) and phone numbers (10-digit NANP) without manual mapping rules.
-- **Smart Deduplication**: Identifies repeat submissions, shared household phones, and fuzzy name matches.
-- **Dry-Run Preview**: Inspect pending responses, match decisions, and similarity scores from the project link before importing. Clean new records can be flagged as do not import; these exclusions persist across page refreshes and are enforced for project imports.
-- **Scheduled Sync**: Automated background sync via REDCap cron.
+- **Automatic Sanitization**: Detects and standardizes dates and phone numbers without configuration
+- **Smart Deduplication**: Identifies repeat submissions, shared household phones, and fuzzy name matches
+- **Dry-Run Preview**: Review pending responses, match decisions, and similarity scores from the project link before importing. Flag responses as "do not import" to skip them
+- **Scheduled Sync**: Optional automated background sync
 
-## Setup
-1. Configure your Qualtrics API Token and Data Center in System or Project Settings.
-2. In Project Settings, specify your **Qualtrics Survey ID** and target deduplication fields.
-3. Use the **Qualtrics Import Preview** link in the project sidebar to test or run imports.
+## Configuration
+
+At the system level enter your API token and Data center if they are shared across projects. Otherwise they can be entered at the project level. At the project level enter your survey ID and review further settings for deduplication configuration and import mappings.
+
+## Installing
+
+You can install the module from the REDCap EM repo or drop it directly in your modules folder (i.e. `/modules/qualtrics_importer_v1.0.0`) manually.
