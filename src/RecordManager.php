@@ -40,9 +40,8 @@ class RecordManager
 
         foreach ($decoded as $row) {
             $recId = (string)($row[$idField] ?? '');
-            if ($recId === '') {
+            if ($recId === '')
                 continue;
-            }
 
             $pool[] = [
                 'record_id' => $recId,
@@ -70,13 +69,11 @@ class RecordManager
     ): string {
         $strategy = $config['record_id_strategy'] ?? 'seed_increment';
 
-        if ($strategy === 'qualtrics_response_id') {
+        if ($strategy === 'qualtrics_response_id')
             return $candidateResponseId;
-        }
 
-        if ($strategy === 'autonumber') {
+        if ($strategy === 'autonumber')
             return (string)REDCap::reserveNewRecordId($projectId);
-        }
 
         // Default: seed_increment
         if ($seedCounter === 0) {
@@ -84,9 +81,8 @@ class RecordManager
             $numericIds = [0];
             foreach ($poolRecords as $rec) {
                 $id = $rec['record_id'];
-                if (ctype_digit($id)) {
+                if (ctype_digit($id))
                     $numericIds[] = (int)$id;
-                }
             }
             $seedCounter = max(max($numericIds) + 1, $minSeed);
         }
@@ -109,17 +105,15 @@ class RecordManager
 
         if (!empty($noteUpdates)) {
             $noteSaveRes = REDCap::saveData($projectId, 'json', json_encode(array_values($noteUpdates)));
-            if (!empty($noteSaveRes['errors'])) {
+            if (!empty($noteSaveRes['errors']))
                 $results['errors'][] = "Notes error: " . json_encode($noteSaveRes['errors']);
-            }
             $results['notes_updated_count'] = count($noteSaveRes['ids'] ?? []);
         }
 
         if (!empty($newRecords)) {
             $importSaveRes = REDCap::saveData($projectId, 'json', json_encode(array_values($newRecords)));
-            if (!empty($importSaveRes['errors'])) {
+            if (!empty($importSaveRes['errors']))
                 $results['errors'][] = "Import error: " . json_encode($importSaveRes['errors']);
-            }
             $results['imported_count'] = count($importSaveRes['ids'] ?? []);
         }
 

@@ -44,14 +44,13 @@ class AutoSanitizer
     {
         $fn = strtolower(trim($fieldName));
         $excludedSuffixes = ['_type', '_time', '_notes', '_desc', '_yn', '_flag', '_status'];
-        foreach ($excludedSuffixes as $suffix) {
-            if (str_ends_with($fn, $suffix)) {
+        foreach ($excludedSuffixes as $suffix)
+            if (str_ends_with($fn, $suffix))
                 return false;
-            }
-        }
-        if (str_starts_with($fn, 'p_screen_')) {
+
+        if (str_starts_with($fn, 'p_screen_'))
             return false;
-        }
+
         return (bool)preg_match(self::PHONE_FIELD_PATTERN, $fn);
     }
 
@@ -62,11 +61,10 @@ class AutoSanitizer
     {
         $fn = strtolower(trim($fieldName));
         $excludedSuffixes = ['_time', '_notes', '_desc', '_type', '_score'];
-        foreach ($excludedSuffixes as $suffix) {
-            if (str_ends_with($fn, $suffix)) {
+        foreach ($excludedSuffixes as $suffix)
+            if (str_ends_with($fn, $suffix))
                 return false;
-            }
-        }
+
         return (bool)preg_match(self::DATE_FIELD_PATTERN, $fn);
     }
 
@@ -75,40 +73,35 @@ class AutoSanitizer
      */
     public static function isValidPhone(?string $phone): bool
     {
-        if (empty($phone)) {
+        if (empty($phone))
             return false;
-        }
+
         $digits = preg_replace('/\D/', '', (string)$phone);
-        if (strlen($digits) === 11 && str_starts_with($digits, '1')) {
+        if (strlen($digits) === 11 && str_starts_with($digits, '1'))
             $digits = substr($digits, 1);
-        }
-        if (strlen($digits) !== 10) {
+
+        if (strlen($digits) !== 10)
             return false;
-        }
 
         // Rejection lists for invalid/dummy numbers
         $invalidNumbers = ['0000000000', '0123456789', '0987654321', '1234567890'];
-        if (in_array($digits, $invalidNumbers, true)) {
+        if (in_array($digits, $invalidNumbers, true))
             return false;
-        }
 
         // Check for all identical digits (e.g., 5555555555)
-        if (count(array_unique(str_split($digits))) === 1) {
+        if (count(array_unique(str_split($digits))) === 1)
             return false;
-        }
 
         $areaCode = substr($digits, 0, 3);
         $exchange = substr($digits, 3, 3);
 
         // NANP rules: First digit cannot be 0 or 1
-        if (in_array($areaCode[0], ['0', '1'], true) || in_array($exchange[0], ['0', '1'], true)) {
+        if (in_array($areaCode[0], ['0', '1'], true) || in_array($exchange[0], ['0', '1'], true))
             return false;
-        }
 
         // Second and third digits cannot both be 1 (e.g., N11 codes)
-        if (substr($areaCode, 1, 2) === '11' || substr($exchange, 1, 2) === '11') {
+        if (substr($areaCode, 1, 2) === '11' || substr($exchange, 1, 2) === '11')
             return false;
-        }
 
         return true;
     }
@@ -118,16 +111,16 @@ class AutoSanitizer
      */
     public static function sanitizePhone($phone, bool $validate = false): string
     {
-        if ($phone === null || $phone === '') {
+        if ($phone === null || $phone === '')
             return '';
-        }
+
         $digits = preg_replace('/\D/', '', (string)$phone);
-        if (strlen($digits) === 11 && str_starts_with($digits, '1')) {
+        if (strlen($digits) === 11 && str_starts_with($digits, '1'))
             $digits = substr($digits, 1);
-        }
-        if ($validate && !self::isValidPhone($digits)) {
+
+        if ($validate && !self::isValidPhone($digits))
             return '';
-        }
+
         return $digits;
     }
 
@@ -137,9 +130,9 @@ class AutoSanitizer
     public static function formatPhone($phone): string
     {
         $digits = self::sanitizePhone($phone);
-        if (strlen($digits) !== 10) {
+        if (strlen($digits) !== 10)
             return (string)$phone;
-        }
+
         return sprintf('(%s) %s-%s', substr($digits, 0, 3), substr($digits, 3, 3), substr($digits, 6, 4));
     }
 
@@ -149,70 +142,39 @@ class AutoSanitizer
      */
     public static function sanitizeDate($val): ?string
     {
-        if ($val === null) {
+        if ($val === null)
             return null;
-        }
 
-        if ($val instanceof DateTime) {
+        if ($val instanceof DateTime)
             return $val->format('Y-m-d');
-        }
 
         $s = trim((string)$val);
-        if ($s === '') {
+        if ($s === '')
             return '';
-        }
 
         // 1. Standard ISO format: YYYY-MM-DD
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $s, $m)) {
-            if (checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
-                return $s;
-            }
-            return null;
-        }
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $s, $m))
+            return checkdate((int)$m[2], (int)$m[3], (int)$m[1]) ? $s : null;
 
         // 2. ISO timestamp format: YYYY-MM-DD[T ]HH:MM...
         if (preg_match('/^(\d{4}-\d{2}-\d{2})[T ]\d{2}:\d{2}(?::\d{2})?.*/', $s, $m)) {
-            $datePart = $m[1];
-            $parts = explode('-', $datePart);
-            if (checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0])) {
-                return $datePart;
-            }
-            return null;
+            $parts = explode('-', $m[1]);
+            return checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0]) ? $m[1] : null;
         }
 
         // 3. MM/DD/YYYY or MM-DD-YYYY or M/D/YYYY or M-D-YYYY
-        if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $s, $m)) {
-            $month = (int)$m[1];
-            $day = (int)$m[2];
-            $year = (int)$m[3];
-            if (checkdate($month, $day, $year)) {
-                return sprintf('%04d-%02d-%02d', $year, $month, $day);
-            }
-            return null;
-        }
+        if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $s, $m))
+            return checkdate((int)$m[1], (int)$m[2], (int)$m[3]) ? sprintf('%04d-%02d-%02d', (int)$m[3], (int)$m[1], (int)$m[2]) : null;
 
         // 4. YYYY/MM/DD or YYYY/M/D
-        if (preg_match('/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/', $s, $m)) {
-            $year = (int)$m[1];
-            $month = (int)$m[2];
-            $day = (int)$m[3];
-            if (checkdate($month, $day, $year)) {
-                return sprintf('%04d-%02d-%02d', $year, $month, $day);
-            }
-            return null;
-        }
+        if (preg_match('/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/', $s, $m))
+            return checkdate((int)$m[2], (int)$m[3], (int)$m[1]) ? sprintf('%04d-%02d-%02d', (int)$m[1], (int)$m[2], (int)$m[3]) : null;
 
         // 5. MM/DD/YY or MM-DD-YY
         if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/', $s, $m)) {
-            $month = (int)$m[1];
-            $day = (int)$m[2];
             $shortYear = (int)$m[3];
-            // Standard 2-digit cutoff (>= 70 -> 1900s, < 70 -> 2000s)
             $year = ($shortYear >= 70) ? (1900 + $shortYear) : (2000 + $shortYear);
-            if (checkdate($month, $day, $year)) {
-                return sprintf('%04d-%02d-%02d', $year, $month, $day);
-            }
-            return null;
+            return checkdate((int)$m[1], (int)$m[2], $year) ? sprintf('%04d-%02d-%02d', $year, (int)$m[1], (int)$m[2]) : null;
         }
 
         return null;
@@ -224,40 +186,38 @@ class AutoSanitizer
      */
     public static function sanitizeDataValue(string $fieldName, $val, ?array $fieldMetadata = null)
     {
-        if ($val === null || $val === '') {
+        if ($val === null || $val === '')
             return $val;
-        }
 
         $strVal = trim((string)$val);
         $valType = $fieldMetadata['element_validation_type'] ?? '';
 
         // 1. REDCap metadata hints
-        if ($valType === 'phone') {
+        if ($valType === 'phone')
             return self::sanitizePhone($val, true);
-        }
+
         if (str_starts_with($valType, 'date_') || str_starts_with($valType, 'datetime_')) {
             $parsed = self::sanitizeDate($val);
             return $parsed !== null ? $parsed : '';
         }
 
         // 2. Phone detection via field name or value pattern
-        if (self::isPhoneFieldName($fieldName)) {
+        if (self::isPhoneFieldName($fieldName))
             return self::sanitizePhone($val, true);
-        }
-        if (preg_match(self::PHONE_VALUE_PATTERN, $strVal) && self::isValidPhone($strVal)) {
+
+        if (preg_match(self::PHONE_VALUE_PATTERN, $strVal) && self::isValidPhone($strVal))
             return self::sanitizePhone($val, true);
-        }
 
         // 3. Date detection via field name or value pattern
         if (self::isDateFieldName($fieldName)) {
             $parsed = self::sanitizeDate($val);
             return $parsed !== null ? $parsed : '';
         }
+
         if (preg_match('/[\/\-]/', $strVal)) {
             $parsed = self::sanitizeDate($val);
-            if ($parsed !== null) {
+            if ($parsed !== null)
                 return $parsed;
-            }
         }
 
         return $val;

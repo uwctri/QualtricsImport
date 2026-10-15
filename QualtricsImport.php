@@ -29,19 +29,16 @@ class QualtricsImport extends AbstractExternalModule
      */
     public function hasImportPermission(int $projectId, ?string $username = null): bool
     {
-        if (ExternalModules::isSuperUser()) {
+        if (ExternalModules::isSuperUser())
             return true;
-        }
 
         $username = $username ?: ExternalModules::getUsername();
-        if (empty($username)) {
+        if (empty($username))
             return false;
-        }
 
         $userRights = REDCap::getUserRights($username)[$username] ?? null;
-        if (empty($userRights)) {
+        if (empty($userRights))
             return false;
-        }
 
         $permissionLevel = (string)($this->getProjectSetting('link_display_permission', $projectId) ?: 'all');
         $allowedUsers = (array)($this->getProjectSetting('allowed_users', $projectId) ?: []);
@@ -65,13 +62,11 @@ class QualtricsImport extends AbstractExternalModule
         bool $isSuperUser = false,
         array $allowedUsers = []
     ): bool {
-        if ($isSuperUser) {
+        if ($isSuperUser)
             return true;
-        }
 
-        if (empty($username) || empty($userRights)) {
+        if (empty($username) || empty($userRights))
             return false;
-        }
 
         return match ($permissionLevel) {
             'design' => !empty($userRights['design']),
@@ -90,9 +85,8 @@ class QualtricsImport extends AbstractExternalModule
      */
     public function redcap_every_page_top()
     {
-        if (!$this->isPage('ExternalModules/manager/project.php')) {
+        if (!$this->isPage('ExternalModules/manager/project.php'))
             return;
-        }
 
         $this->initializeJavascriptModuleObject();
         $this->passArgument('prefix', $this->PREFIX);
@@ -105,9 +99,8 @@ class QualtricsImport extends AbstractExternalModule
      */
     public function redcap_module_configuration_settings($project_id, $settings)
     {
-        if (!$project_id || $this->getSystemSetting('allow_project_overrides')) {
+        if (!$project_id || $this->getSystemSetting('allow_project_overrides'))
             return $settings;
-        }
 
         $keysToRemove = [
             'override_credentials',
@@ -125,9 +118,8 @@ class QualtricsImport extends AbstractExternalModule
      */
     public function redcap_module_ajax($action, $payload, $project_id)
     {
-        if (!$this->hasImportPermission((int)$project_id)) {
+        if (!$this->hasImportPermission((int)$project_id))
             throw new Exception("You do not have permission to access Qualtrics Import for this project.");
-        }
 
         $limit = isset($payload['limit']) ? max(1, min(10000, (int)$payload['limit'])) : 1000;
         $sinceType = (string)($payload['sinceType'] ?? 'auto');
@@ -171,28 +163,22 @@ class QualtricsImport extends AbstractExternalModule
         $processedCount = 0;
         foreach ($this->getProjectsWithModuleEnabled() as $pid) {
             $projectId = (int)$pid;
-            if (!$this->getProjectSetting('import_enabled', $projectId)) {
+            if (!$this->getProjectSetting('import_enabled', $projectId))
                 continue;
-            }
 
             $surveyId = trim((string)$this->getProjectSetting('qualtrics_survey_id', $projectId));
-            if ($surveyId === '') {
-                // Silently skip if survey ID is not configured (no error logging)
-                continue;
-            }
+            if ($surveyId === '')
+                continue; // Silently skip if survey ID is not configured (no error logging)
 
-            if (!$this->hasQualtricsCredentials($projectId)) {
-                // Silently skip if credentials are not configured (no error logging)
-                continue;
-            }
+            if (!$this->hasQualtricsCredentials($projectId))
+                continue; // Silently skip if credentials are not configured (no error logging)
 
             $frequency = (int)($this->getProjectSetting('sync_frequency', $projectId) ?: 3600);
             $lastRun = (int)$this->getProjectSetting('last_cron_run_timestamp', $projectId);
             $now = time();
 
-            if (($now - $lastRun) < $frequency) {
+            if (($now - $lastRun) < $frequency)
                 continue;
-            }
 
             try {
                 $this->executeImportPipeline($projectId, false, true);
@@ -224,13 +210,11 @@ class QualtricsImport extends AbstractExternalModule
         try {
             if (method_exists($this, 'getSubSettings')) {
                 $subMappings = $this->getSubSettings('custom_value_mappings', $projectId);
-                if (!empty($subMappings) && is_array($subMappings)) {
+                if (!empty($subMappings) && is_array($subMappings))
                     $config['custom_value_mappings'] = $subMappings;
-                }
                 $subDefaults = $this->getSubSettings('static_field_defaults', $projectId);
-                if (!empty($subDefaults) && is_array($subDefaults)) {
+                if (!empty($subDefaults) && is_array($subDefaults))
                     $config['static_field_defaults'] = $subDefaults;
-                }
             }
         } catch (\Throwable) {
             // Fall back to getProjectSettings
@@ -263,9 +247,9 @@ class QualtricsImport extends AbstractExternalModule
         if (!empty($config['target_event'])) {
             $targetEvent = (string)$config['target_event'];
             $uniqueEventNames = (new \Project($projectId))->getUniqueEventNames();
-            if (isset($uniqueEventNames[$targetEvent])) {
+            if (isset($uniqueEventNames[$targetEvent]))
                 $config['target_event'] = $uniqueEventNames[$targetEvent];
-            } elseif (!in_array($targetEvent, $uniqueEventNames, true)) {
+            elseif (!in_array($targetEvent, $uniqueEventNames, true)) {
                 $emptyResponse['message'] = 'The configured Target Event is invalid. Please select a valid event in the module settings.';
                 return $emptyResponse;
             }
@@ -283,20 +267,18 @@ class QualtricsImport extends AbstractExternalModule
 
         // 1. Fetch survey responses from Qualtrics
         $client = $this->getQualtricsClient($projectId);
-        if ($isCron) {
+        if ($isCron)
             $startDate = $this->getProjectSetting('last_successful_sync_time', $projectId);
-        } elseif ($customStartDate !== null) {
+        elseif ($customStartDate !== null)
             $startDate = $customStartDate;
-        } else {
+        else
             $startDate = $this->resolveStartDate($projectId, $sinceType ?? 'auto');
-        }
 
         $rawSurveyRows = $client->exportResponses($surveyId, $startDate);
         $totalRetrieved = count($rawSurveyRows);
 
-        if ($limit !== null && $limit > 0 && $totalRetrieved > $limit) {
+        if ($limit !== null && $limit > 0 && $totalRetrieved > $limit)
             $rawSurveyRows = array_slice($rawSurveyRows, 0, $limit);
-        }
 
         // 2. Fetch existing records and metadata from REDCap
         $poolRecords = RecordManager::fetchExistingRecords($projectId, $config);
@@ -360,9 +342,8 @@ class QualtricsImport extends AbstractExternalModule
                     $candPhone = $alreadyImported['phone1'] ?? '';
 
                     foreach ($poolRecords as $other) {
-                        if ($other['record_id'] === $alreadyImported['record_id']) {
+                        if ($other['record_id'] === $alreadyImported['record_id'])
                             continue;
-                        }
                         $otherPhone = $other['phone1'] ?? '';
                         $otherFirst = $other['first_name'] ?? '';
                         $otherLast = $other['last_name'] ?? '';
@@ -413,7 +394,7 @@ class QualtricsImport extends AbstractExternalModule
                 ];
                 $evaluations[] = $evalSummary;
 
-                if (!$isDryRun) {
+                if (!$isDryRun)
                     $this->log("Qualtrics Import: Duplicate response excluded", [
                         'project_id' => $projectId,
                         'qualtrics_id' => $respId,
@@ -424,7 +405,6 @@ class QualtricsImport extends AbstractExternalModule
                         'matched_record_id' => $evalSummary['matched_record_id'],
                         'description' => $evalSummary['description'],
                     ]);
-                }
                 continue;
             }
 
@@ -446,14 +426,13 @@ class QualtricsImport extends AbstractExternalModule
                 ];
                 $categoryCounts['user_excluded']++;
 
-                if (!$isDryRun) {
+                if (!$isDryRun)
                     $this->log("Qualtrics Import: Response excluded by user", [
                         'project_id' => $projectId,
                         'qualtrics_id' => $respId,
                         'candidate_name' => $previewInfo['name'],
                         'status' => 'skipped_manual',
                     ]);
-                }
                 continue;
             }
 
@@ -474,7 +453,7 @@ class QualtricsImport extends AbstractExternalModule
                 ];
                 $categoryCounts['missing_required']++;
 
-                if (!$isDryRun) {
+                if (!$isDryRun)
                     $this->log("Qualtrics Import: Response excluded", [
                         'project_id' => $projectId,
                         'qualtrics_id' => $respId,
@@ -483,7 +462,6 @@ class QualtricsImport extends AbstractExternalModule
                         'status' => 'skipped_ineligible',
                         'reason' => $exclusionReason ?: 'Excluded by filter logic, completion status, or missing required fields',
                     ]);
-                }
                 continue;
             }
 
@@ -541,9 +519,8 @@ class QualtricsImport extends AbstractExternalModule
                         REDCap::getRecordIdField() => $origId,
                         $notesField => ($origNotes !== '') ? "{$origNotes}\n{$noteEntry}" : $noteEntry,
                     ];
-                    if ($targetEvent !== '') {
+                    if ($targetEvent !== '')
                         $noteUpdateRecord['redcap_event_name'] = $targetEvent;
-                    }
                     $noteUpdatesToSave[$origId] = $noteUpdateRecord;
                 }
 
@@ -558,7 +535,7 @@ class QualtricsImport extends AbstractExternalModule
 
                 $evaluations[] = $evalSummary;
 
-                if (!$isDryRun) {
+                if (!$isDryRun)
                     $this->log("Qualtrics Import: Duplicate response excluded", [
                         'project_id' => $projectId,
                         'qualtrics_id' => $mapped['qualtrics_id'],
@@ -569,7 +546,6 @@ class QualtricsImport extends AbstractExternalModule
                         'matched_record_id' => $eval['matched_record']['record_id'] ?? $eval['original_record_id'] ?? null,
                         'description' => $eval['description'],
                     ]);
-                }
                 continue;
             }
 
@@ -583,17 +559,13 @@ class QualtricsImport extends AbstractExternalModule
             );
 
             $mapped[REDCap::getRecordIdField()] = $allocatedId;
-            if (!isset($mapped['import_date'])) {
+            if (!isset($mapped['import_date']))
                 $mapped['import_date'] = $today;
-            }
-            if (!isset($mapped['first_import_date'])) {
+            if (!isset($mapped['first_import_date']))
                 $mapped['first_import_date'] = $today;
-            }
 
-
-            if (!empty($eval['candidate_note']) && !empty($config['import_notes_field'])) {
+            if (!empty($eval['candidate_note']) && !empty($config['import_notes_field']))
                 $mapped[$config['import_notes_field']] = $eval['candidate_note'];
-            }
 
             $evalSummary['record_id'] = $allocatedId;
             $evaluations[] = $evalSummary;
@@ -601,12 +573,10 @@ class QualtricsImport extends AbstractExternalModule
             $newRecordsToSave[] = $mapped;
             $importedRecordIds[] = $allocatedId;
 
-            if ($eval['status'] === 'accepted_case_4') {
+            if ($eval['status'] === 'accepted_case_4')
                 $categoryCounts['case_4_suspected']++;
-            } else {
+            else
                 $categoryCounts['clean_new']++;
-            }
-
 
             // Add accepted record to pool for intra-batch deduplication
             $poolRecords[] = [
@@ -648,16 +618,15 @@ class QualtricsImport extends AbstractExternalModule
         ];
 
         // 5. Commit to REDCap if not dry run
-        if ($isDryRun) {
+        if ($isDryRun)
             return $results;
-        }
 
         $results['commit_results'] = RecordManager::commitImports($projectId, $newRecordsToSave, $noteUpdatesToSave);
         $results['imported_count'] = $results['commit_results']['imported_count'];
         $results['notes_updated_count'] = $results['commit_results']['notes_updated_count'];
-        if (empty($results['commit_results']['errors'])) {
+        if (empty($results['commit_results']['errors']))
             $this->setProjectSetting('last_successful_sync_time', gmdate('Y-m-d\TH:i:s\Z'), $projectId);
-        }
+
         $this->log("Qualtrics Import completed for project {$projectId}", [
             'project_id' => $projectId,
             'imported_count' => $results['imported_count'],
@@ -675,14 +644,12 @@ class QualtricsImport extends AbstractExternalModule
     private function getManuallyExcludedResponseIds(int $projectId): array
     {
         $stored = $this->getProjectSetting('manual-excluded-response-ids', $projectId);
-        if (empty($stored)) {
+        if (empty($stored))
             return [];
-        }
 
         $responseIds = is_array($stored) ? $stored : json_decode((string)$stored, true);
-        if (!is_array($responseIds)) {
+        if (!is_array($responseIds))
             throw new Exception('Saved manual import exclusions are invalid. Clear or repair the module setting before importing.');
-        }
 
         return $this->normalizeManualExclusionIds($responseIds);
     }
@@ -692,14 +659,12 @@ class QualtricsImport extends AbstractExternalModule
      */
     private function saveManuallyExcludedResponseIds(int $projectId, $responseIds): array
     {
-        if (!is_array($responseIds)) {
+        if (!is_array($responseIds))
             throw new Exception('The manual exclusion list must be an array of Qualtrics ResponseIds.');
-        }
 
         $responseIds = $this->normalizeManualExclusionIds($responseIds);
-        if (count($responseIds) > 10000) {
+        if (count($responseIds) > 10000)
             throw new Exception('The manual exclusion list cannot contain more than 10,000 ResponseIds.');
-        }
 
         $this->setProjectSetting('manual-excluded-response-ids', json_encode($responseIds), $projectId);
         return $responseIds;
@@ -709,14 +674,12 @@ class QualtricsImport extends AbstractExternalModule
     {
         $normalized = [];
         foreach ($responseIds as $responseId) {
-            if (!is_scalar($responseId)) {
+            if (!is_scalar($responseId))
                 throw new Exception('The manual exclusion list contains an invalid ResponseId.');
-            }
 
             $responseId = trim((string)$responseId);
-            if ($responseId !== '') {
+            if ($responseId !== '')
                 $normalized[$responseId] = $responseId;
-            }
         }
 
         return array_values($normalized);
@@ -757,9 +720,8 @@ class QualtricsImport extends AbstractExternalModule
             ? $this->getProjectSetting('project_qualtrics_data_center', $projectId)
             : $this->getSystemSetting('qualtrics_data_center');
 
-        if (empty($token) || empty($dataCenter)) {
+        if (empty($token) || empty($dataCenter))
             throw new Exception("Qualtrics credentials (token and data center) must be configured in settings.");
-        }
 
         return new QualtricsClient((string)$token, (string)$dataCenter);
     }

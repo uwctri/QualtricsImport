@@ -51,9 +51,8 @@ class QualtricsClient
     {
         try {
             $response = $this->request('GET', 'surveys?limit=1');
-            if (isset($response['result'])) {
+            if (isset($response['result']))
                 return ['success' => true, 'message' => 'Connected successfully to Qualtrics API.'];
-            }
             return ['success' => false, 'message' => 'Qualtrics returned unexpected response structure.'];
         } catch (Exception $e) {
             return ['success' => false, 'message' => 'Connection failed: ' . $e->getMessage()];
@@ -69,13 +68,12 @@ class QualtricsClient
         $response = $this->request('GET', 'surveys');
         $elements = $response['result']['elements'] ?? [];
         $surveys = [];
-        foreach ($elements as $el) {
+        foreach ($elements as $el)
             $surveys[] = [
                 'id' => $el['id'] ?? '',
                 'name' => $el['name'] ?? '',
                 'isActive' => $el['isActive'] ?? false,
             ];
-        }
         return $surveys;
     }
 
@@ -91,21 +89,18 @@ class QualtricsClient
 
         foreach ($questions as $qid => $q) {
             $tag = trim((string)($q['DataExportTag'] ?? ''));
-            if ($tag === '') {
+            if ($tag === '')
                 continue;
-            }
             $qidClean = strtoupper(trim((string)$qid));
             $tagMap[$qidClean] = $tag;
 
             // Also map any SubQuestions if present
-            if (!empty($q['SubQuestions']) && is_array($q['SubQuestions'])) {
+            if (!empty($q['SubQuestions']) && is_array($q['SubQuestions']))
                 foreach ($q['SubQuestions'] as $subId => $subQ) {
                     $subTag = trim((string)($subQ['DataExportTag'] ?? ''));
-                    if ($subTag !== '') {
+                    if ($subTag !== '')
                         $tagMap[strtoupper((string)$subId)] = $subTag;
-                    }
                 }
-            }
         }
 
         return $tagMap;
@@ -124,9 +119,8 @@ class QualtricsClient
             'format' => 'json',
             'compress' => true,
         ];
-        if (!empty($startDate)) {
+        if (!empty($startDate))
             $payload['startDate'] = $startDate;
-        }
 
         // Fetch survey question DataExportTags for automatic column resolution
         $tagMap = [];
@@ -140,9 +134,8 @@ class QualtricsClient
         // Step 1: Initiate export job
         $initRes = $this->request('POST', "surveys/{$surveyId}/export-responses", $payload);
         $progressId = $initRes['result']['progressId'] ?? null;
-        if (empty($progressId)) {
+        if (empty($progressId))
             throw new Exception("Qualtrics export initiation failed: progressId not returned.");
-        }
 
         // Step 2: Poll progress until complete (with timeout safety)
         $maxAttempts = 40;
@@ -164,14 +157,12 @@ class QualtricsClient
                 break;
             }
 
-            if ($status === 'failed') {
+            if ($status === 'failed')
                 throw new Exception("Qualtrics export job failed on remote server.");
-            }
         }
 
-        if (!$isComplete) {
+        if (!$isComplete)
             throw new Exception("Qualtrics export timed out after {$maxAttempts} seconds.");
-        }
 
         // Step 3: Download exported file
         $downloadEndpoint = $fileId
@@ -179,9 +170,8 @@ class QualtricsClient
             : "surveys/{$surveyId}/export-responses/{$progressId}/file";
 
         $zipData = $this->downloadFile($downloadEndpoint);
-        if (empty($zipData)) {
+        if (empty($zipData))
             throw new Exception("Downloaded Qualtrics export file was empty.");
-        }
 
         // Step 4: Decompress ZIP and parse JSON
         return $this->extractResponsesFromZip($zipData, $tagMap);
@@ -212,14 +202,12 @@ class QualtricsClient
         $zip->close();
         @unlink($tempZip);
 
-        if (empty($jsonStr)) {
+        if (empty($jsonStr))
             throw new Exception("No JSON file found in Qualtrics export archive.");
-        }
 
         $decoded = json_decode($jsonStr, true);
-        if (!is_array($decoded)) {
+        if (!is_array($decoded))
             throw new Exception("Failed to decode JSON response from Qualtrics export.");
-        }
 
         $rawResponses = $decoded['responses'] ?? $decoded;
         return self::normalizeResponses($rawResponses, $tagMap);
@@ -234,53 +222,43 @@ class QualtricsClient
 
         // Build uppercase lookup for tag map
         $tagLookup = [];
-        foreach ($tagMap as $k => $v) {
+        foreach ($tagMap as $k => $v)
             $tagLookup[strtoupper(trim((string)$k))] = trim((string)$v);
-        }
 
         foreach ($rawResponses as $idx => $item) {
-            if (!is_array($item)) {
+            if (!is_array($item))
                 continue;
-            }
 
             // Qualtrics v3 JSON format often nests survey answer fields under 'values'
             $row = [];
             if (isset($item['values']) && is_array($item['values'])) {
                 $row = $item['values'];
-                if (isset($item['responseId'])) {
+                if (isset($item['responseId']))
                     $row['ResponseId'] = $item['responseId'];
-                }
             } else {
                 $row = $item;
             }
 
             // Ensure ResponseId is set
-            if (!isset($row['ResponseId']) && isset($item['responseId'])) {
+            if (!isset($row['ResponseId']) && isset($item['responseId']))
                 $row['ResponseId'] = $item['responseId'];
-            }
 
             // Normalize common metadata keys for consistent PascalCase access
-            if (isset($row['startDate']) && !isset($row['StartDate'])) {
+            if (isset($row['startDate']) && !isset($row['StartDate']))
                 $row['StartDate'] = $row['startDate'];
-            }
-            if (isset($row['endDate']) && !isset($row['EndDate'])) {
+            if (isset($row['endDate']) && !isset($row['EndDate']))
                 $row['EndDate'] = $row['endDate'];
-            }
-            if (isset($row['recordedDate']) && !isset($row['RecordedDate'])) {
+            if (isset($row['recordedDate']) && !isset($row['RecordedDate']))
                 $row['RecordedDate'] = $row['recordedDate'];
-            }
-            if (isset($row['finished']) && !isset($row['Finished'])) {
+            if (isset($row['finished']) && !isset($row['Finished']))
                 $row['Finished'] = $row['finished'];
-            }
-            if (isset($row['progress']) && !isset($row['Progress'])) {
+            if (isset($row['progress']) && !isset($row['Progress']))
                 $row['Progress'] = $row['progress'];
-            }
 
             // Skip header or non-response rows
             $respId = (string)($row['ResponseId'] ?? '');
-            if (empty($respId) || !str_starts_with($respId, 'R_')) {
+            if (empty($respId) || !str_starts_with($respId, 'R_'))
                 continue;
-            }
 
             // Translate QID keys using DataExportTag mapping if available
             if (!empty($tagLookup)) {
@@ -291,9 +269,8 @@ class QualtricsClient
 
                     if (isset($tagLookup[$kUpper])) {
                         $tag = $tagLookup[$kUpper];
-                        if (!isset($row[$tag]) || trim((string)$row[$tag]) === '') {
+                        if (!isset($row[$tag]) || trim((string)$row[$tag]) === '')
                             $row[$tag] = $v;
-                        }
                         continue;
                     }
 
@@ -304,11 +281,10 @@ class QualtricsClient
 
                         // Normalize Q29 <-> QID29
                         $candQids = [$rawBase];
-                        if (str_starts_with($rawBase, 'QID')) {
+                        if (str_starts_with($rawBase, 'QID'))
                             $candQids[] = 'Q' . substr($rawBase, 3);
-                        } else {
+                        else
                             $candQids[] = 'QID' . substr($rawBase, 1);
-                        }
 
                         foreach ($candQids as $cand) {
                             if (isset($tagLookup[$cand])) {
@@ -322,14 +298,12 @@ class QualtricsClient
                             if (strtoupper($sub) === 'TEXT') {
                                 $row[$tag . '_TEXT'] = $v;
                                 // Respondent text entries take precedence over choice codes if non-empty
-                                if (trim((string)$v) !== '') {
+                                if (trim((string)$v) !== '')
                                     $row[$tag] = $v;
-                                }
                             } else {
                                 $row["{$tag}_{$sub}"] = $v;
-                                if (is_numeric($sub)) {
+                                if (is_numeric($sub))
                                     $row["{$tag}___{$sub}"] = $v;
-                                }
                             }
                         }
                     }
@@ -376,9 +350,8 @@ class QualtricsClient
         $curlError = curl_error($ch);
         curl_close($ch);
 
-        if ($rawResponse === false) {
+        if ($rawResponse === false)
             throw new Exception("Qualtrics API request error: " . $curlError);
-        }
 
         $decoded = json_decode($rawResponse, true);
         if ($httpCode >= 400) {
@@ -413,9 +386,8 @@ class QualtricsClient
         $curlError = curl_error($ch);
         curl_close($ch);
 
-        if ($binaryData === false || $httpCode >= 400) {
+        if ($binaryData === false || $httpCode >= 400)
             throw new Exception("Failed to download Qualtrics export file (HTTP {$httpCode}): {$curlError}");
-        }
 
         return $binaryData;
     }

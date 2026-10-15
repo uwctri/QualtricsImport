@@ -54,13 +54,12 @@ class FieldMapper
             $finished = $rawRow['Finished'] ?? $rawRow['finished'] ?? '';
             if ($finished !== '1' && $finished !== 1 && strtolower((string)$finished) !== 'true') {
                 $completeness = self::analyzeResponseCompleteness($rawRow);
-                if ($completeness['status'] === 'completely_blank') {
+                if ($completeness['status'] === 'completely_blank')
                     $exclusionReason = "Incomplete response: response was completely blank";
-                } elseif ($completeness['status'] === 'mostly_blank') {
+                elseif ($completeness['status'] === 'mostly_blank')
                     $exclusionReason = "Incomplete response: response was {$completeness['summary']}";
-                } else {
+                else
                     $exclusionReason = "Incomplete response (Finished is '{$finished}')";
-                }
                 return null;
             }
         }
@@ -70,9 +69,8 @@ class FieldMapper
 
         // Build lowercase lookup table for raw row keys
         $rawLower = [];
-        foreach ($rawRow as $k => $v) {
+        foreach ($rawRow as $k => $v)
             $rawLower[strtolower(trim((string)$k))] = (string)$k;
-        }
 
         $customMappings = self::parseCustomMappings($config);
         $mapped = [];
@@ -85,12 +83,10 @@ class FieldMapper
             $valKey = null;
             $val = self::findQualtricsValue($rawRow, $qField, $rawLower, $valKey);
             if ($val !== null) {
-                if ($valKey !== null) {
+                if ($valKey !== null)
                     $matchedRawKeys[$valKey] = true;
-                }
-                if (isset($cm['value_map'][(string)$val])) {
+                if (isset($cm['value_map'][(string)$val]))
                     $val = $cm['value_map'][(string)$val];
-                }
                 $mapped[$rField] = $val;
             }
         }
@@ -98,15 +94,12 @@ class FieldMapper
         // In auto_map_blacklist mode, auto-map any remaining raw keys that directly match REDCap fields
         if ($mappingMode !== 'whitelist') {
             foreach ($rawRow as $key => $val) {
-                if (isset($matchedRawKeys[$key]) || isset($mapped[$key])) {
+                if (isset($matchedRawKeys[$key]) || isset($mapped[$key]))
                     continue;
-                }
-                if (in_array($key, self::STANDARD_QUALTRICS_METADATA, true) || in_array($key, $skipFields, true)) {
+                if (in_array($key, self::STANDARD_QUALTRICS_METADATA, true) || in_array($key, $skipFields, true))
                     continue;
-                }
-                if (!empty($redcapFieldNames) && !in_array($key, $redcapFieldNames, true)) {
+                if (!empty($redcapFieldNames) && !in_array($key, $redcapFieldNames, true))
                     continue;
-                }
                 $mapped[$key] = $val;
             }
         }
@@ -114,21 +107,18 @@ class FieldMapper
         // 3. Automatic Data Sanitization (Dates and Phones)
         $importNotesField = $config['import_notes_field'] ?? '';
         foreach ($mapped as $field => $val) {
-            if (in_array($field, AutoSanitizer::CORE_SYSTEM_FIELDS, true) || $field === $importNotesField) {
+            if (in_array($field, AutoSanitizer::CORE_SYSTEM_FIELDS, true) || $field === $importNotesField)
                 continue;
-            }
             $mapped[$field] = AutoSanitizer::sanitizeDataValue($field, $val, $redcapMetadata[$field] ?? null);
         }
 
         // 4. Set standard baseline fields
         $qualtricsIdField = $config['qualtrics_id_field'] ?? 'qualtrics_id';
-        if ($qualtricsIdField !== '') {
+        if ($qualtricsIdField !== '')
             $mapped[$qualtricsIdField] = $respId;
-        }
         $mapped['qualtrics_id'] = $respId;
-        if (!empty($config['target_event'])) {
+        if (!empty($config['target_event']))
             $mapped['redcap_event_name'] = $config['target_event'];
-        }
 
         $phoneField = $config['dedup_phone_field'] ?? 'phone1';
         $firstField = $config['dedup_first_name_field'] ?? 'first_name';
@@ -136,27 +126,23 @@ class FieldMapper
 
         $mapped['phone1'] = AutoSanitizer::sanitizePhone($mapped[$phoneField] ?? $rawRow['phone1'] ?? '', true);
         $rawFirstName = $mapped[$firstField] ?? $rawRow['first_name'] ?? '';
-        if (is_numeric(trim((string)$rawFirstName))) {
+        if (is_numeric(trim((string)$rawFirstName)))
             $rawFirstName = '';
-        }
         $rawLastName = $mapped[$lastField] ?? $rawRow['last_name'] ?? '';
-        if (is_numeric(trim((string)$rawLastName))) {
+        if (is_numeric(trim((string)$rawLastName)))
             $rawLastName = '';
-        }
         $mapped['first_name'] = Deduplicator::sanitizeName($rawFirstName);
         $mapped['last_name'] = Deduplicator::sanitizeName($rawLastName);
 
         // Sanitize middle initial/name and strip pandas/missing placeholders like 'Nan', 'None', 'N/A'
         $rawMiddle = trim((string)($mapped['middle_initial'] ?? $rawRow['middle_initial'] ?? ''));
-        if (in_array(strtolower($rawMiddle), ['nan', 'null', 'none', 'n/a', 'na'], true)) {
+        if (in_array(strtolower($rawMiddle), ['nan', 'null', 'none', 'n/a', 'na'], true))
             $mapped['middle_initial'] = '';
-        } else {
+        else
             $mapped['middle_initial'] = Deduplicator::sanitizeName($rawMiddle);
-        }
 
-        if (isset($mapped['middle_name']) && in_array(strtolower(trim((string)$mapped['middle_name'])), ['nan', 'null', 'none', 'n/a', 'na'], true)) {
+        if (isset($mapped['middle_name']) && in_array(strtolower(trim((string)$mapped['middle_name'])), ['nan', 'null', 'none', 'n/a', 'na'], true))
             $mapped['middle_name'] = '';
-        }
 
         $mapped['display_name'] = trim("{$mapped['first_name']} {$mapped['last_name']}");
 
@@ -166,36 +152,30 @@ class FieldMapper
         foreach ($staticDefaults as $sf) {
             $sField = $sf['field_name'];
             $sVal = $sf['field_value'];
-            if ($sField === '') {
+            if ($sField === '')
                 continue;
-            }
             // Protect core demographic fields from being overwritten by numeric flags (e.g. import flag = 1)
-            if (in_array($sField, ['first_name', 'last_name'], true) && is_numeric($sVal)) {
+            if (in_array($sField, ['first_name', 'last_name'], true) && is_numeric($sVal))
                 continue;
-            }
-            if (strtolower($sVal) === 'today') {
+            if (strtolower($sVal) === 'today')
                 $mapped[$sField] = $today;
-            } elseif (strtolower($sVal) === 'now') {
+            elseif (strtolower($sVal) === 'now')
                 $mapped[$sField] = date('Y-m-d H:i:s');
-            } else {
+            else
                 $mapped[$sField] = $sVal;
-            }
         }
-
-
 
         // 5. Evaluate REDCap filter logic if configured
         if (!empty($config['filter_logic'])) {
             $evalContext = array_merge($rawRow, $mapped);
             if (!self::evaluateFilterLogic($config['filter_logic'], $evalContext, $projectId)) {
                 $completeness = self::analyzeResponseCompleteness($rawRow);
-                if ($completeness['status'] === 'completely_blank') {
+                if ($completeness['status'] === 'completely_blank')
                     $exclusionReason = "Excluded by filter logic (response was completely blank)";
-                } elseif ($completeness['status'] === 'mostly_blank') {
+                elseif ($completeness['status'] === 'mostly_blank')
                     $exclusionReason = "Excluded by filter logic (response was {$completeness['summary']})";
-                } else {
+                else
                     $exclusionReason = "Excluded by filter logic: {$config['filter_logic']}";
-                }
                 return null;
             }
         }
@@ -204,21 +184,19 @@ class FieldMapper
         $reqFieldsRaw = $config['required_fields'] ?? 'phone1,first_name,last_name';
         $requiredFields = array_filter(array_map('trim', explode(',', $reqFieldsRaw)));
         $missing = [];
-        foreach ($requiredFields as $rf) {
-            if (!isset($mapped[$rf]) || trim((string)$mapped[$rf]) === '') {
+        foreach ($requiredFields as $rf)
+            if (!isset($mapped[$rf]) || trim((string)$mapped[$rf]) === '')
                 $missing[] = $rf;
-            }
-        }
+
         if (!empty($missing)) {
             $completeness = self::analyzeResponseCompleteness($rawRow);
             $missingText = 'Missing required field(s): ' . implode(', ', $missing);
-            if ($completeness['status'] === 'completely_blank') {
+            if ($completeness['status'] === 'completely_blank')
                 $exclusionReason = "Response was completely blank. {$missingText}";
-            } elseif ($completeness['status'] === 'mostly_blank') {
+            elseif ($completeness['status'] === 'mostly_blank')
                 $exclusionReason = "{$completeness['summary']}. {$missingText}";
-            } else {
+            else
                 $exclusionReason = $missingText;
-            }
             return null;
         }
 
@@ -267,9 +245,8 @@ class FieldMapper
                     break;
                 }
             }
-            if ($andPassed) {
+            if ($andPassed)
                 return true;
-            }
         }
         return false;
     }
@@ -280,9 +257,8 @@ class FieldMapper
     public static function evaluateAtomicCondition(string $condition, array $record): bool
     {
         $condition = trim($condition, '() ');
-        if ($condition === '') {
+        if ($condition === '')
             return true;
-        }
 
         if (preg_match('/^\[([a-zA-Z0-9_\-]+)(?:\(([a-zA-Z0-9_\-]+)\))?\]\s*(==|=|!=|<>|<=|>=|<|>)\s*[\'"]?([^\'"]*)[\'"]?$/', $condition, $m)) {
             $field = $m[1];
@@ -292,11 +268,10 @@ class FieldMapper
 
             $val = '';
             if ($cbCode !== '') {
-                if (isset($record["{$field}___{$cbCode}"])) {
+                if (isset($record["{$field}___{$cbCode}"]))
                     $val = (string)$record["{$field}___{$cbCode}"];
-                } elseif (isset($record[$field]) && is_array($record[$field])) {
+                elseif (isset($record[$field]) && is_array($record[$field]))
                     $val = in_array($cbCode, $record[$field]) ? '1' : '0';
-                }
             } else {
                 $val = isset($record[$field]) ? (string)$record[$field] : '';
             }
@@ -331,25 +306,22 @@ class FieldMapper
         if (!empty($config['custom_value_mappings']) && is_array($config['custom_value_mappings'])) {
             $isAssocList = false;
             foreach ($config['custom_value_mappings'] as $row) {
-                if (!is_array($row) || (!isset($row['qualtrics_field']) && !isset($row['redcap_field']))) {
+                if (!is_array($row) || (!isset($row['qualtrics_field']) && !isset($row['redcap_field'])))
                     continue;
-                }
                 $isAssocList = true;
                 $qField = trim((string)($row['qualtrics_field'] ?? ''));
                 $rField = trim((string)($row['redcap_field'] ?? ''));
                 $vJson = $row['value_map_json'] ?? '';
-                if ($qField === '' || $rField === '') {
+                if ($qField === '' || $rField === '')
                     continue;
-                }
                 $mappings[] = [
                     'qualtrics_field' => $qField,
                     'redcap_field' => $rField,
                     'value_map' => self::parseValueMap($vJson),
                 ];
             }
-            if ($isAssocList) {
+            if ($isAssocList)
                 return $mappings;
-            }
         }
 
         // Handle raw parallel arrays from getProjectSettings()
@@ -359,9 +331,8 @@ class FieldMapper
                 $qField = trim((string)$q);
                 $rField = trim((string)($config['redcap_field'][$idx] ?? ''));
                 $vJson = $config['value_map_json'][$idx] ?? '';
-                if ($qField === '' || $rField === '') {
+                if ($qField === '' || $rField === '')
                     continue;
-                }
                 $mappings[] = [
                     'qualtrics_field' => $qField,
                     'redcap_field' => $rField,
@@ -384,23 +355,20 @@ class FieldMapper
         if (!empty($config['static_field_defaults']) && is_array($config['static_field_defaults'])) {
             $isAssocList = false;
             foreach ($config['static_field_defaults'] as $row) {
-                if (!is_array($row) || (!isset($row['field_name']) && !isset($row['field_value']))) {
+                if (!is_array($row) || (!isset($row['field_name']) && !isset($row['field_value'])))
                     continue;
-                }
                 $isAssocList = true;
                 $fName = trim((string)($row['field_name'] ?? ''));
                 $fVal = trim((string)($row['field_value'] ?? ''));
-                if ($fName === '') {
+                if ($fName === '')
                     continue;
-                }
                 $defaults[] = [
                     'field_name' => $fName,
                     'field_value' => $fVal,
                 ];
             }
-            if ($isAssocList) {
+            if ($isAssocList)
                 return $defaults;
-            }
         }
 
         // Handle raw parallel arrays from getProjectSettings()
@@ -408,9 +376,8 @@ class FieldMapper
             foreach ($config['field_name'] as $idx => $fn) {
                 $fName = trim((string)$fn);
                 $fVal = trim((string)($config['field_value'][$idx] ?? ''));
-                if ($fName === '') {
+                if ($fName === '')
                     continue;
-                }
                 $defaults[] = [
                     'field_name' => $fName,
                     'field_value' => $fVal,
@@ -426,12 +393,10 @@ class FieldMapper
      */
     public static function parseValueMap($val): array
     {
-        if (empty($val)) {
+        if (empty($val))
             return [];
-        }
-        if (is_array($val)) {
+        if (is_array($val))
             return $val;
-        }
         $decoded = json_decode((string)$val, true);
         return is_array($decoded) ? $decoded : [];
     }
@@ -445,16 +410,14 @@ class FieldMapper
     {
         $matchedKey = null;
         $qFieldTrimmed = trim($qField);
-        if ($qFieldTrimmed === '') {
+        if ($qFieldTrimmed === '')
             return null;
-        }
 
         // Build lowercase index once
         if ($rawLower === null) {
             $rawLower = [];
-            foreach ($rawRow as $k => $v) {
+            foreach ($rawRow as $k => $v)
                 $rawLower[strtolower(trim((string)$k))] = (string)$k;
-            }
         }
 
         $lowerTarget = strtolower($qFieldTrimmed);
@@ -481,21 +444,17 @@ class FieldMapper
                 $candidates[] = "{$num}";
             }
         } else {
-            if (!str_ends_with($lowerTarget, '_text')) {
-                // Prefer _text variant if present
+            if (!str_ends_with($lowerTarget, '_text'))
                 $candidates[] = $lowerTarget . '_text';
-            }
             $candidates[] = $lowerTarget;
-            if (str_ends_with($lowerTarget, '_text')) {
+            if (str_ends_with($lowerTarget, '_text'))
                 $candidates[] = substr($lowerTarget, 0, -5);
-            }
         }
 
         // 1. Check candidates: if candidate exists in row and is non-empty, return it immediately
         foreach ($candidates as $cand) {
-            if (!isset($rawLower[$cand])) {
+            if (!isset($rawLower[$cand]))
                 continue;
-            }
             $realKey = $rawLower[$cand];
             $val = $rawRow[$realKey] ?? null;
             if ($val !== null && trim((string)$val) !== '') {
@@ -525,17 +484,15 @@ class FieldMapper
     public static function extractCandidatePreviewInfo(array $rawRow, array $config): array
     {
         $rawLower = [];
-        foreach ($rawRow as $k => $v) {
+        foreach ($rawRow as $k => $v)
             $rawLower[strtolower(trim((string)$k))] = (string)$k;
-        }
 
         $customMappings = self::parseCustomMappings($config);
         $mappedVals = [];
         foreach ($customMappings as $cm) {
             $val = self::findQualtricsValue($rawRow, $cm['qualtrics_field'], $rawLower);
-            if ($val !== null && trim((string)$val) !== '') {
+            if ($val !== null && trim((string)$val) !== '')
                 $mappedVals[$cm['redcap_field']] = $val;
-            }
         }
 
         $phoneField = $config['dedup_phone_field'] ?? 'phone1';
@@ -563,12 +520,10 @@ class FieldMapper
             ?? '';
 
         // If first or last name is numeric (e.g. '1'), discard it (it's a choice code, not a name)
-        if (is_numeric(trim((string)$first))) {
+        if (is_numeric(trim((string)$first)))
             $first = '';
-        }
-        if (is_numeric(trim((string)$last))) {
+        if (is_numeric(trim((string)$last)))
             $last = '';
-        }
 
         return [
             'name' => trim(Deduplicator::sanitizeName((string)$first) . ' ' . Deduplicator::sanitizeName((string)$last)),
@@ -597,20 +552,17 @@ class FieldMapper
         $answeredCount = 0;
         foreach ($rawRow as $key => $val) {
             $kLower = strtolower(trim((string)$key));
-            if (isset($metadataLower[$kLower])) {
+            if (isset($metadataLower[$kLower]))
                 continue;
-            }
-            if ($val !== null && trim((string)$val) !== '') {
+            if ($val !== null && trim((string)$val) !== '')
                 $answeredCount++;
-            }
         }
 
         $progress = null;
-        if (isset($rawRow['Progress']) && is_numeric($rawRow['Progress'])) {
+        if (isset($rawRow['Progress']) && is_numeric($rawRow['Progress']))
             $progress = (int)$rawRow['Progress'];
-        } elseif (isset($rawRow['progress']) && is_numeric($rawRow['progress'])) {
+        elseif (isset($rawRow['progress']) && is_numeric($rawRow['progress']))
             $progress = (int)$rawRow['progress'];
-        }
 
         // 1. Completely blank: no question answers, or explicit 0% progress with 0 answers
         if ($answeredCount === 0 || ($progress !== null && $progress === 0 && $answeredCount === 0)) {
@@ -628,9 +580,8 @@ class FieldMapper
 
         if ($isMostlyBlank) {
             $summary = 'Response was mostly blank';
-            if ($progress !== null && $progress > 0) {
+            if ($progress !== null && $progress > 0)
                 $summary .= " ({$progress}% progress)";
-            }
             return [
                 'status' => 'mostly_blank',
                 'answered_count' => $answeredCount,

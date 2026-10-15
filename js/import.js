@@ -46,15 +46,13 @@
         if (!str || str === 'None') return '-';
 
         // If date-only format (YYYY-MM-DD), return as-is without shifting
-        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str))
             return str;
-        }
 
         // Qualtrics timestamps are UTC. If no timezone offset is attached, treat as UTC ('Z')
         let isoStr = str.replace(' ', 'T');
-        if (!isoStr.endsWith('Z') && !/[+-]\d{2}(:\d{2})?$/.test(isoStr)) {
+        if (!isoStr.endsWith('Z') && !/[+-]\d{2}(:\d{2})?$/.test(isoStr))
             isoStr += 'Z';
-        }
 
         const date = new Date(isoStr);
         if (isNaN(date.getTime())) {
@@ -79,9 +77,8 @@
         if (status === 'accepted_case_4' || status === 'skipped_case_4') return `<span class="badge-status badge-case-4">${category}</span>`;
         if (status === 'imported_case_4') return `<span class="badge-status badge-imported-case-4">${category}</span>`;
         if (status === 'skipped_case_1') return `<span class="badge-status badge-imported">${category}</span>`;
-        if (status === 'rejected_invalid_phone' || status === 'skipped_ineligible') {
+        if (status === 'rejected_invalid_phone' || status === 'skipped_ineligible')
             return `<span class="badge-status badge-invalid">${category}</span>`;
-        }
         return `<span class="badge-status badge-clean">${category}</span>`;
     };
 
@@ -124,11 +121,9 @@
         let filtered = evaluations.filter(item => {
             if (selectedStatuses.size === ALL_STATUS_KEYS.length) return true;
             if (selectedStatuses.size === 0) return false;
-            for (const key of selectedStatuses) {
-                if (STATUS_MAP[key] && STATUS_MAP[key].includes(item.status)) {
+            for (const key of selectedStatuses)
+                if (STATUS_MAP[key] && STATUS_MAP[key].includes(item.status))
                     return true;
-                }
-            }
             return false;
         });
 
@@ -378,9 +373,8 @@
                 }
 
                 const readyCount = (currentData.evaluations || []).filter(item => ['accepted_clean', 'accepted_case_4'].includes(item.status)).length;
-                if (readyCount > 0 || currentData.note_updates_count > 0) {
+                if (readyCount > 0 || currentData.note_updates_count > 0)
                     $('#btnRunImport').prop('disabled', false);
-                }
 
                 if (currentData.diagnostics) {
                     $('#btnDiagnostics').show();
@@ -404,9 +398,8 @@
             cancelButtonText: 'Cancel',
             reverseButtons: true
         });
-        if (!confirmation.isConfirmed) {
+        if (!confirmation.isConfirmed)
             return;
-        }
 
         $('#btnRunImport').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Importing...');
         $('#btnRefresh').prop('disabled', true);
@@ -468,9 +461,8 @@
                 const raw = $lastSyncHeader.text().trim();
                 if (raw && raw !== 'None') {
                     const formatted = formatStartDate(raw);
-                    if (formatted !== '-') {
+                    if (formatted !== '-')
                         $lastSyncHeader.text(formatted).attr('title', `Qualtrics UTC: ${raw}`);
-                    }
                 }
             }
 
@@ -479,9 +471,8 @@
                 const raw = $lastSyncOpt.attr('data-last-sync');
                 if (raw) {
                     const formatted = formatStartDate(raw);
-                    if (formatted !== '-') {
+                    if (formatted !== '-')
                         $lastSyncOpt.text(`Since Last Import (${formatted})`);
-                    }
                 }
             }
         };
@@ -490,9 +481,8 @@
         // Restore remembered limit if present
         try {
             const savedLimit = localStorage.getItem('qualtrics_import_preview_limit');
-            if (savedLimit) {
+            if (savedLimit)
                 $('#previewLimit').val(savedLimit);
-            }
         } catch (e) {
             // Ignore localStorage errors
         }
@@ -515,11 +505,10 @@
 
             const shouldExclude = row.status !== 'skipped_manual';
             const updatedResponseIds = new Set(manuallyExcludedResponseIds);
-            if (shouldExclude) {
+            if (shouldExclude)
                 updatedResponseIds.add(qualtricsId);
-            } else {
+            else
                 updatedResponseIds.delete(qualtricsId);
-            }
 
             manualExclusionSaveInProgress = true;
             $('#btnRunImport').prop('disabled', true);
@@ -530,9 +519,8 @@
 
             module.ajax('saveManualExclusions', { responseIds: Array.from(updatedResponseIds) })
                 .then(res => {
-                    if (!res || !res.success || !Array.isArray(res.responseIds)) {
+                    if (!res || !res.success || !Array.isArray(res.responseIds))
                         throw new Error('REDCap did not confirm that the exclusion was saved.');
-                    }
 
                     manuallyExcludedResponseIds.clear();
                     res.responseIds.forEach(id => manuallyExcludedResponseIds.add(String(id)));
@@ -566,11 +554,10 @@
         // Status filter checkbox toggle
         $(document).on('change', '.status-checkbox', function() {
             const val = $(this).val();
-            if ($(this).is(':checked')) {
+            if ($(this).is(':checked'))
                 selectedStatuses.add(val);
-            } else {
+            else
                 selectedStatuses.delete(val);
-            }
             updateStatusFilterSummary();
             if (!currentData) return;
             renderTable(currentData.evaluations || []);
@@ -632,9 +619,8 @@
             const $icon = $thisTh.find('.sort-icon');
             $icon.removeClass('fa-sort').addClass(sortDirection === 'asc' ? 'fa-sort-up text-primary' : 'fa-sort-down text-primary');
 
-            if (currentData) {
+            if (currentData)
                 renderTable(currentData.evaluations || []);
-            }
         });
 
     /**
@@ -652,22 +638,19 @@
             const qUpper = String(q).trim().toUpperCase();
             qidToTag[qUpper] = tag;
             // Normalize Q29 vs QID29
-            if (qUpper.startsWith('QID')) {
+            if (qUpper.startsWith('QID'))
                 qidToTag['Q' + qUpper.slice(3)] = tag;
-            } else if (qUpper.startsWith('Q') && /^\d+$/.test(qUpper.slice(1))) {
+            else if (qUpper.startsWith('Q') && /^\d+$/.test(qUpper.slice(1)))
                 qidToTag['QID' + qUpper.slice(1)] = tag;
-            }
 
-            if (!tagToQid[tag.toLowerCase()]) {
+            if (!tagToQid[tag.toLowerCase()])
                 tagToQid[tag.toLowerCase()] = q;
-            }
         });
 
         const customMap = {};
         customMappings.forEach(m => {
-            if (m.qualtrics_field && m.redcap_field) {
+            if (m.qualtrics_field && m.redcap_field)
                 customMap[String(m.qualtrics_field).trim().toLowerCase()] = String(m.redcap_field).trim();
-            }
         });
 
         return (key, sampleKeysUpper = {}) => {
@@ -676,9 +659,8 @@
             let aliasDesc = null;
 
             // 1. Direct match in qidToTag (e.g. QID29 or Q29)
-            if (qidToTag[kUpper]) {
+            if (qidToTag[kUpper])
                 aliasDesc = `alias: ${qidToTag[kUpper]}`;
-            }
             // 2. Regex match for QID_suffix (e.g. QID29_TEXT or QID10_1)
             else if (/^(Q(?:ID)?\d+)_(.+)$/i.test(key)) {
                 const m = key.match(/^(Q(?:ID)?\d+)_(.+)$/i);
@@ -689,25 +671,19 @@
                     if (baseQid.startsWith('QID')) tag = qidToTag['Q' + baseQid.slice(3)];
                     else if (baseQid.startsWith('Q')) tag = qidToTag['QID' + baseQid.slice(1)];
                 }
-                if (tag) {
-                    if (suffix.toUpperCase() === 'TEXT') {
-                        aliasDesc = `alias: ${tag}`;
-                    } else {
-                        aliasDesc = `alias: ${tag}_${suffix}`;
-                    }
-                }
+                if (tag)
+                    aliasDesc = (suffix.toUpperCase() === 'TEXT') ? `alias: ${tag}` : `alias: ${tag}_${suffix}`;
             }
             // 3. Reverse match: key is a DataExportTag (e.g. first_name, last_name)
             else if (tagToQid[kLower]) {
                 const origQid = tagToQid[kLower];
                 const textKey = `${origQid}_TEXT`;
-                if (sampleKeysUpper[textKey.toUpperCase()]) {
+                if (sampleKeysUpper[textKey.toUpperCase()])
                     aliasDesc = `alias for ${sampleKeysUpper[textKey.toUpperCase()]}`;
-                } else if (sampleKeysUpper[origQid.toUpperCase()]) {
+                else if (sampleKeysUpper[origQid.toUpperCase()])
                     aliasDesc = `alias for ${sampleKeysUpper[origQid.toUpperCase()]}`;
-                } else {
+                else
                     aliasDesc = `alias for ${origQid}`;
-                }
             }
             // 4. Reverse choice or suffix match (e.g. first_name_TEXT, symptoms_1, symptoms___1)
             else if (/^(.+?)_(?:TEXT|\d+|__\d+)$/i.test(key)) {
@@ -718,18 +694,14 @@
                     const origQid = tagToQid[baseTag];
                     if (choiceNum) {
                         const candChoice = `${origQid}_${choiceNum}`;
-                        if (sampleKeysUpper[candChoice.toUpperCase()]) {
-                            aliasDesc = `alias for ${sampleKeysUpper[candChoice.toUpperCase()]}`;
-                        } else {
-                            aliasDesc = `alias for ${origQid}_${choiceNum}`;
-                        }
+                        aliasDesc = sampleKeysUpper[candChoice.toUpperCase()]
+                            ? `alias for ${sampleKeysUpper[candChoice.toUpperCase()]}`
+                            : `alias for ${origQid}_${choiceNum}`;
                     } else {
                         const candText = `${origQid}_TEXT`;
-                        if (sampleKeysUpper[candText.toUpperCase()]) {
-                            aliasDesc = `alias for ${sampleKeysUpper[candText.toUpperCase()]}`;
-                        } else {
-                            aliasDesc = `alias for ${origQid}_TEXT`;
-                        }
+                        aliasDesc = sampleKeysUpper[candText.toUpperCase()]
+                            ? `alias for ${sampleKeysUpper[candText.toUpperCase()]}`
+                            : `alias for ${origQid}_TEXT`;
                     }
                 }
             }
@@ -737,11 +709,9 @@
             // Append custom mapping target if present
             if (customMap[kLower]) {
                 const rcTarget = customMap[kLower];
-                if (aliasDesc) {
-                    aliasDesc += ` \u2192 REDCap: ${rcTarget}`;
-                } else {
-                    aliasDesc = `maps to REDCap: ${rcTarget}`;
-                }
+                aliasDesc = aliasDesc
+                    ? `${aliasDesc} \u2192 REDCap: ${rcTarget}`
+                    : `maps to REDCap: ${rcTarget}`;
             }
 
             return aliasDesc;
@@ -753,9 +723,8 @@
      * comments on lines that have an alias or mapping.
      */
     const formatSampleJsonWithAliases = (sampleObj, tagMap, customMappings) => {
-        if (!sampleObj || typeof sampleObj !== 'object' || (Array.isArray(sampleObj) && sampleObj.length === 0) || Object.keys(sampleObj).length === 0) {
+        if (!sampleObj || typeof sampleObj !== 'object' || (Array.isArray(sampleObj) && sampleObj.length === 0) || Object.keys(sampleObj).length === 0)
             return '<span class="text-muted">No raw survey response data available.</span>';
-        }
 
         const resolveAlias = buildAliasResolver(tagMap, customMappings);
         const sampleKeysUpper = {};
@@ -775,9 +744,8 @@
                 const alias = resolveAlias(key, sampleKeysUpper);
                 if (alias) {
                     lineAliases[idx] = alias;
-                    if (line.length > maxLen) {
+                    if (line.length > maxLen)
                         maxLen = line.length;
-                    }
                 }
             }
         });
@@ -789,9 +757,8 @@
         const resultLines = lines.map((line, idx) => {
             const safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const alias = lineAliases[idx];
-            if (!alias) {
+            if (!alias)
                 return safeLine;
-            }
             const padLen = Math.max(3, targetCol - line.length);
             const padding = ' '.repeat(padLen);
             const safeAlias = alias.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -872,9 +839,8 @@
 
         module.ajax('getManualExclusions', {})
             .then(res => {
-                if (!res || !res.success || !Array.isArray(res.responseIds)) {
+                if (!res || !res.success || !Array.isArray(res.responseIds))
                     throw new Error('REDCap did not return the saved manual exclusions.');
-                }
 
                 res.responseIds.forEach(id => manuallyExcludedResponseIds.add(String(id)));
                 manualExclusionsLoaded = true;

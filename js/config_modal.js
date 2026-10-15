@@ -7,9 +7,8 @@
     $modal.on('show.bs.modal', function () {
         if ($(this).data('module') !== module.prefix) return;
 
-        if (typeof ExternalModules.Settings.prototype.resetConfigInstancesOld === 'undefined') {
+        if (typeof ExternalModules.Settings.prototype.resetConfigInstancesOld === 'undefined')
             ExternalModules.Settings.prototype.resetConfigInstancesOld = ExternalModules.Settings.prototype.resetConfigInstances;
-        }
 
         ExternalModules.Settings.prototype.resetConfigInstances = function () {
             ExternalModules.Settings.prototype.resetConfigInstancesOld();
@@ -17,9 +16,8 @@
 
 
             // Hide credential override options if system setting does not allow project overrides
-            if (!module.allowProjectOverrides) {
+            if (!module.allowProjectOverrides)
                 $modal.find('[field="override_credentials"], [field="project_qualtrics_api_token"], [field="project_qualtrics_data_center"]').hide();
-            }
 
             // Hide qualtrics_id_field dropdown if storing ResponseId directly in record_id
             const updateStrategyVisibility = () => {

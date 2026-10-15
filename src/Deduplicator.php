@@ -9,9 +9,8 @@ class Deduplicator
      */
     public static function stripName(?string $name): string
     {
-        if (empty($name)) {
+        if (empty($name))
             return '';
-        }
         return strtolower(preg_replace('/[^a-zA-Z]/', '', $name));
     }
 
@@ -20,9 +19,8 @@ class Deduplicator
      */
     public static function sanitizeName(?string $name): string
     {
-        if (empty($name)) {
+        if (empty($name))
             return '';
-        }
         return ucfirst(strtolower(trim($name)));
     }
 
@@ -35,12 +33,10 @@ class Deduplicator
         $n1 = self::stripName($name1);
         $n2 = self::stripName($name2);
 
-        if ($n1 === '' || $n2 === '') {
+        if ($n1 === '' || $n2 === '')
             return 0.0;
-        }
-        if ($n1 === $n2) {
+        if ($n1 === $n2)
             return 1.0;
-        }
 
         similar_text($n1, $n2, $percent);
         return round($percent / 100.0, 4);
@@ -99,9 +95,8 @@ class Deduplicator
                     $cPhone = $existing['phone1'] ?? '';
 
                     foreach ($poolRecords as $other) {
-                        if ($other['record_id'] === $existing['record_id']) {
+                        if ($other['record_id'] === $existing['record_id'])
                             continue;
-                        }
                         $oPhone = $other['phone1'] ?? '';
                         if ($cPhone === '' || $oPhone === '' || $cPhone !== $oPhone) {
                             $fSim = self::nameSimilarity($cFirst, $other['first_name'] ?? '');
